@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# Name: UserParser
+# Description: Данный модуль позволяет копировать ID, Username и Name участников чата при помощи команды .userpars
 # meta developer: @iwasakura
 
 from .. import loader, utils
