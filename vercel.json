@@ -1,7 +1,7 @@
 {
   "headers": [
     {
-      "source": "/modules/(.*)",
+      "source": "/(.*)",
       "headers": [
         {
           "key": "Content-Type",
