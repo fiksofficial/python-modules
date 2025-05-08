@@ -1,2 +1,6 @@
 deepseek
 userparser
+ChannelAdapter
+Getusername
+lyrics
+irisrp
