@@ -2,5 +2,5 @@ deepseek
 userparser
 ChannelAdapter
 Getusername
-lyrics
-irisrp
+Lyrics
+IrisRP
