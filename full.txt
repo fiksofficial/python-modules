@@ -4,3 +4,4 @@ ChannelAdapter
 Getusername
 Lyrics
 IrisRP
+switchtohikka
