@@ -1,3 +1,5 @@
+# meta developer: @PyModule
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from hikkatl.types import Message
 from .. import loader, utils
