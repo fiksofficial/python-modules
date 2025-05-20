@@ -1,1 +1,1 @@
-# Модули канала [@PyModules](https://pymodules.t.me)
+# Модули канала [@PyModule](https://pymodule.t.me)
