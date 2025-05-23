@@ -1,3 +1,6 @@
+# На модуль распространяется лицензия "GNU General Public License v3.0"
+# https://github.com/all-licenses/GNU-General-Public-License-v3.0
+
 # -*- coding: utf-8 -*-
 # Name: UserParser
 # Description: Данный модуль позволяет копировать ID, Username и Name участников чата при помощи команды .userpars
