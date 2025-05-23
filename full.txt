@@ -6,3 +6,4 @@ Lyrics
 IrisRP
 switchtohikka
 speedtest
+randomizer
