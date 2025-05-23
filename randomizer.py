@@ -25,9 +25,8 @@ class RandomizerMod(loader.Module):
     }
 
     @loader.command(
-        ru_doc="Выбирает случайное значение из перечисленных через запятую",
         doc="Picks a random value from those listed (comma-separated)",
-        aliases=["rd"]
+        ru_doc="Выбирает случайное значение из перечисленных через запятую"
     )
     async def randomizecmd(self, message: Message):
         args = utils.get_args_raw(message)
