@@ -7,3 +7,4 @@ IrisRP
 switchtohikka
 speedtest
 randomizer
+dscanner
