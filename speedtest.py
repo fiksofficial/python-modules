@@ -22,10 +22,12 @@ class SpeedTestMod(loader.Module):
             download_speed = st.download() / 1_000_000
             upload_speed = st.upload() / 1_000_000
 
-        await msg.edit(
-            f"<emoji document_id=5325547803936572038>✨</emoji> <b>Speedtest завершён!</b> <emoji document_id=5325547803936572038>✨</emoji>\n\n"
-            f"<b>Ping:</b> <i>{ping:.2f} ms</i>\n"
-            f"<emoji document_id=6041730074376410123>📥</emoji> <b>Загрузка:</b> <i>{download_speed:.2f} Mbps</i>\n"
-            f"<emoji document_id=6041730074376410123>📤</emoji> <b>Отдача:</b> <i>{upload_speed:.2f} Mbps</i>",
-            parse_mode="HTML"
-        )
+            await msg.edit(
+                f"<emoji document_id=5325547803936572038>✨</emoji> <b>Speedtest завершён!</b> <emoji document_id=5325547803936572038>✨</emoji>\n\n"
+                f"<b>Ping:</b> <i>{ping:.2f} ms</i>\n"
+                f"<emoji document_id=6041730074376410123>📥</emoji> <b>Загрузка:</b> <i>{download_speed:.2f} Mbps</i>\n"
+                f"<emoji document_id=6041730074376410123>📤</emoji> <b>Отдача:</b> <i>{upload_speed:.2f} Mbps</i>",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            await msg.edit(f"<b>Ошибка при выполнении speedtest:</b> <code>{e}</code>")
