@@ -1,9 +1,9 @@
 deepseek
 userparser
-ChannelAdapter
-Getusername
-Lyrics
-IrisRP
+channeladapter
+getusername
+lyrics
+irisrp
 switchtohikka
 speedtest
 randomizer
