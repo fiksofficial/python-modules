@@ -4,7 +4,6 @@ channeladapter
 getusername
 lyrics
 irisrp
-switchtohikka
 speedtest
 randomizer
 dscanner
