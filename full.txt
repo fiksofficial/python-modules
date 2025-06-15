@@ -7,3 +7,4 @@ irisrp
 speedtest
 randomizer
 dscanner
+autoprofile
