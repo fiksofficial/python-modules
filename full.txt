@@ -8,3 +8,4 @@ speedtest
 randomizer
 dscanner
 autoprofile
+sysinfo
