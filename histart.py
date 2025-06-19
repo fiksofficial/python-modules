@@ -29,8 +29,8 @@ class HistartMod(loader.Module):
     strings = {
         "name": "Histart",
         "cfg_interval": "✅ Restart will occur every <b>{}</b>",
-        "enabled_on": "✅ <b>Auto-restart enabled. Restarting UserBot...</b>",
-        "enabled_off": "🛑 <b>Auto-restart disabled. Restarting UserBot...</b>",
+        "enabled_on": "✅ <b>Auto-restart enabled.</b>",
+        "enabled_off": "🛑 <b>Auto-restart disabled.</b>",
         "invalid_format": "❌ <b>Invalid format.</b> Example: <code>1h30m</code>",
         "status_enabled": "✅ Auto-restart is currently <b>enabled</b>",
         "status_disabled": "🛑 Auto-restart is currently <b>disabled</b>",
@@ -38,14 +38,15 @@ class HistartMod(loader.Module):
 
     strings_ru = {
         "cfg_interval": "✅ <b>Рестарт будет каждые {}</b>",
-        "enabled_on": "✅ <b>Авто-рестарт включён. Перезагрузка юзербота...</b>",
-        "enabled_off": "🛑 <b>Авто-рестарт выключен. Перезагрузка юзербота...</b>",
+        "enabled_on": "✅ <b>Авто-рестарт включён.</b>",
+        "enabled_off": "🛑 <b>Авто-рестарт выключен.</b>",
         "invalid_format": "❌ <b>Неверный формат.</b> Пример: <code>1h30m</code>",
         "status_enabled": "✅ Авто-рестарт сейчас <b>включён</b>",
         "status_disabled": "🛑 Авто-рестарт сейчас <b>выключен</b>",
     }
 
     def __init__(self):
+        self._task = None
         self.config = loader.ModuleConfig(
             loader.ConfigValue(
                 "enabled",
@@ -66,12 +67,20 @@ class HistartMod(loader.Module):
         self.db = db
 
         if self.config["enabled"]:
-            self._task = asyncio.create_task(self._auto_restart_loop())
+            self._start_loop()
+
+    def _start_loop(self):
+        if self._task and not self._task.done():
+            self._task.cancel()
+        self._task = asyncio.create_task(self._auto_restart_loop())
 
     async def _auto_restart_loop(self):
-        while True:
-            await asyncio.sleep(self.config["interval"])
-            await self.invoke("restart", "-f", peer="me")
+        try:
+            while True:
+                await asyncio.sleep(self.config["interval"])
+                await self.invoke("restart", "-f", peer="me")
+        except asyncio.CancelledError:
+            pass  # task manually cancelled
 
     @loader.command(
         doc="⚙️ Set auto-restart interval. Supports formats like 1h30m, 2d3h.",
@@ -89,7 +98,10 @@ class HistartMod(loader.Module):
         self.config["interval"] = seconds
         short = self._short_format(seconds)
         await utils.answer(message, self.strings("cfg_interval").format(short))
-        await self.invoke("restart", "-f", peer="me")
+
+        # перезапускаем задачу, если уже включено
+        if self.config["enabled"]:
+            self._start_loop()
 
     @loader.command(
         doc="🔁 Enable/disable auto-restart: .histart on | off",
@@ -100,12 +112,15 @@ class HistartMod(loader.Module):
 
         if args == "on":
             self.config["enabled"] = True
+            self._start_loop()
             await utils.answer(message, self.strings("enabled_on"))
-            await self.invoke("restart", "-f", peer="me")
+
         elif args == "off":
             self.config["enabled"] = False
+            if self._task and not self._task.done():
+                self._task.cancel()
             await utils.answer(message, self.strings("enabled_off"))
-            await self.invoke("restart", "-f", peer="me")
+
         else:
             await utils.answer(
                 message,
@@ -123,3 +138,9 @@ class HistartMod(loader.Module):
     def _short_format(self, seconds: int) -> str:
         units = [("y", 31536000), ("w", 604800), ("d", 86400), ("h", 3600), ("m", 60), ("s", 1)]
         result = []
+        for key, val in units:
+            count = seconds // val
+            if count:
+                result.append(f"{count}{key}")
+                seconds %= val
+        return "".join(result)
