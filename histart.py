@@ -21,7 +21,9 @@ import re
 @loader.tds
 class HistartMod(loader.Module):
     """
-    Automatically restarts your userbot at set intervals.
+    🔁 Automatically restarts your userbot at set intervals.
+
+    ⏱ Use .setrestart <interval> and .histart on/off to enable/disable.
     """
 
     strings = {
@@ -30,6 +32,8 @@ class HistartMod(loader.Module):
         "enabled_on": "✅ <b>Auto-restart enabled. Restarting UserBot...</b>",
         "enabled_off": "🛑 <b>Auto-restart disabled. Restarting UserBot...</b>",
         "invalid_format": "❌ <b>Invalid format.</b> Example: <code>1h30m</code>",
+        "status_enabled": "✅ Auto-restart is currently <b>enabled</b>",
+        "status_disabled": "🛑 Auto-restart is currently <b>disabled</b>",
     }
 
     strings_ru = {
@@ -37,6 +41,8 @@ class HistartMod(loader.Module):
         "enabled_on": "✅ <b>Авто-рестарт включён. Перезагрузка юзербота...</b>",
         "enabled_off": "🛑 <b>Авто-рестарт выключен. Перезагрузка юзербота...</b>",
         "invalid_format": "❌ <b>Неверный формат.</b> Пример: <code>1h30m</code>",
+        "status_enabled": "✅ Авто-рестарт сейчас <b>включён</b>",
+        "status_disabled": "🛑 Авто-рестарт сейчас <b>выключен</b>",
     }
 
     def __init__(self):
@@ -44,13 +50,13 @@ class HistartMod(loader.Module):
             loader.ConfigValue(
                 "enabled",
                 False,
-                lambda: "Enable auto-restart",
+                lambda: "Включить авто-рестарт",
                 validator=loader.validators.Boolean(),
             ),
             loader.ConfigValue(
                 "interval",
                 10800,
-                lambda: "Interval between restarts in seconds (e.g. 3600 = 1h)",
+                lambda: "Интервал между рестартами в секундах (например, 3600 = 1ч)",
                 validator=loader.validators.Integer(minimum=1),
             ),
         )
@@ -86,16 +92,26 @@ class HistartMod(loader.Module):
         await self.invoke("restart", "-f", peer="me")
 
     @loader.command(
-        doc="🔁 Toggle auto-restart on/off.",
-        ru_doc="🔁 Включить или выключить авто-рестарт.",
+        doc="🔁 Enable/disable auto-restart: .histart on | off",
+        ru_doc="🔁 Включить или выключить авто-рестарт: .histart on | off",
     )
     async def histart(self, message: Message):
-        self.config["enabled"] = not self.config["enabled"]
-        await utils.answer(
-            message,
-            self.strings("enabled_on") if self.config["enabled"] else self.strings("enabled_off")
-        )
-        await self.invoke("restart", "-f", peer="me")
+        args = utils.get_args_raw(message).lower()
+
+        if args == "on":
+            self.config["enabled"] = True
+            await utils.answer(message, self.strings("enabled_on"))
+            await self.invoke("restart", "-f", peer="me")
+        elif args == "off":
+            self.config["enabled"] = False
+            await utils.answer(message, self.strings("enabled_off"))
+            await self.invoke("restart", "-f", peer="me")
+        else:
+            await utils.answer(
+                message,
+                self.strings("status_enabled") if self.config["enabled"]
+                else self.strings("status_disabled")
+            )
 
     def _parse_interval(self, text: str) -> int | None:
         multipliers = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "y": 31536000}
@@ -107,11 +123,3 @@ class HistartMod(loader.Module):
     def _short_format(self, seconds: int) -> str:
         units = [("y", 31536000), ("w", 604800), ("d", 86400), ("h", 3600), ("m", 60), ("s", 1)]
         result = []
-        for key, val in units:
-            count = seconds // val
-            if count:
-                result.append(f"{count}{key}")
-                seconds %= val
-        return "".join(result)
-
-# Любопытной варваре на базаре нос оторвали! by @fiks_official
