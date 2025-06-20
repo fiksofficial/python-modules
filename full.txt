@@ -10,3 +10,4 @@ dscanner
 autoprofile
 sysinfo
 histart
+cutemessages
