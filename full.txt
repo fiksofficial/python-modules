@@ -1,4 +1,4 @@
-deepseek
+ai
 userparser
 channeladapter
 getusername
