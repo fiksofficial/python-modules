@@ -91,7 +91,7 @@ class AIModule(loader.Module):
                 "API_KEY",
                 "",
                 lambda: self.strings["cfg_api_key"],
-                validator=loader.validators.String()
+                validator=loader.validators.Hidden()
             ),
             loader.ConfigValue(
                 "MODEL",
