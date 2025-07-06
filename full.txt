@@ -11,3 +11,4 @@ autoprofile
 sysinfo
 histart
 cutemessages
+calc
