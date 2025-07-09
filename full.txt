@@ -12,3 +12,6 @@ sysinfo
 histart
 cutemessages
 calc
+githubinfo
+qrgen
+wiki
