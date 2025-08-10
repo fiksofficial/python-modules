@@ -60,7 +60,7 @@ class MultiUnloadModule(loader.Module):
                 module=mod
             ))
             try:
-                await self.invoke("unloadmod", mod, message=message, edit=True)
+                await self.invoke("unloadmod", mod, message=message)
             except ValueError as e:
                 await message.edit(self.strings("error").format(mod=mod, e=e))
                 await asyncio.sleep(1)
