@@ -11,8 +11,10 @@
 # https://github.com/all-licenses/GNU-General-Public-License-v3.0
 
 # meta developer: @pymodule
+# requires: asyncio
 
 from .. import loader, utils
+import asyncio
 
 
 @loader.tds
@@ -58,7 +60,7 @@ class MultiUnloadModule(loader.Module):
                 module=mod
             ))
             try:
-                await self.invoke("unloadmodule", mod, message=message, edit=True)
+                await self.invoke("unloadmod", mod, message=message, edit=True)
             except ValueError as e:
                 await message.edit(self.strings("error").format(mod=mod, e=e))
                 await asyncio.sleep(1)
