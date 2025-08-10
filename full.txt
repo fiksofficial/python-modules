@@ -17,3 +17,4 @@ qrgen
 wiki
 checkhost
 createavatarspack
+multiunloadmodule
