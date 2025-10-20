@@ -442,11 +442,14 @@ class DeviceInfo(loader.Module):
         
         try:
             devices = await self._fetch_json("search", {"q": query, "message": message})
+            logger.debug(f"DeviceInfo: Fetched {len(devices)} devices for query: {query}")
             if not devices:  
+                logger.warning(f"DeviceInfo: No devices found for query: {query}")
                 try:
                     await call.edit(
                         text=self.strings["no_results"].format(query),
                         reply_markup=[],
+                        photo=None,  # Explicitly remove any existing photo
                         disable_web_page_preview=True
                     )
                 except Exception as edit_error:
@@ -462,11 +465,13 @@ class DeviceInfo(loader.Module):
             button_rows = [[{"text": device["name"], "callback": self.show_device_info, "args": [device["id"], query, message_id, chat_id, 0, None]}] for device in devices]
             list_text = self.strings["device_list"].format(len(devices), query)
 
+            # Try to edit the message
             try:
                 logger.debug(f"DeviceInfo: Editing message for back_to_search, query: {query}, call_id: {call.id}")
                 await call.edit(
                     text=list_text,
                     reply_markup=button_rows,
+                    photo=None,  # Explicitly remove any existing photo
                     disable_web_page_preview=True
                 )
             except Exception as edit_error:
@@ -486,6 +491,7 @@ class DeviceInfo(loader.Module):
                 await call.edit(
                     text=self.strings["error"].format(str(e)),
                     reply_markup=[],
+                    photo=None,  # Explicitly remove any existing photo
                     disable_web_page_preview=True
                 )
             except Exception as edit_error:
