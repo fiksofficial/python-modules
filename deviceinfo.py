@@ -60,6 +60,7 @@ class DeviceInfo(loader.Module):
         "next_photo": "▶️ След. фото",
         "prev_photo": "◀️ Пред. фото",
         "back": "🔙 Назад",
+        "back_to_device": "🔙 К устройству",
         "config_saved": "✅ Конфигурация сохранена!",
         "retrying": "🔄 Повторяю запрос... (попытка {}/{} )"
     }
@@ -95,6 +96,7 @@ class DeviceInfo(loader.Module):
         "next_photo": "▶️ Next Photo",
         "prev_photo": "◀️ Prev Photo",
         "back": "🔙 Back",
+        "back_to_device": "🔙 To Device",
         "config_saved": "✅ Configuration saved!",
         "retrying": "🔄 Retrying request... (attempt {}/{})"
     }
@@ -339,19 +341,19 @@ class DeviceInfo(loader.Module):
             # Buttons for additional sections and photo navigation
             buttons = [
                 [
-                    {"text": self.strings["show_body"], "callback": self.show_section, "args": ["body", device_id, query, message_id, chat_id]},
-                    {"text": self.strings["show_memory"], "callback": self.show_section, "args": ["memory", device_id, query, message_id, chat_id]},
+                    {"text": self.strings["show_body"], "callback": self.show_section, "args": ["body", device_id, query, message_id, chat_id, photo_idx]},
+                    {"text": self.strings["show_memory"], "callback": self.show_section, "args": ["memory", device_id, query, message_id, chat_id, photo_idx]},
                 ],
                 [
-                    {"text": self.strings["show_cameras"], "callback": self.show_section, "args": ["cameras", device_id, query, message_id, chat_id]},
-                    {"text": self.strings["show_sound"], "callback": self.show_section, "args": ["sound", device_id, query, message_id, chat_id]},
+                    {"text": self.strings["show_cameras"], "callback": self.show_section, "args": ["cameras", device_id, query, message_id, chat_id, photo_idx]},
+                    {"text": self.strings["show_sound"], "callback": self.show_section, "args": ["sound", device_id, query, message_id, chat_id, photo_idx]},
                 ],
                 [
-                    {"text": self.strings["show_comms"], "callback": self.show_section, "args": ["comms", device_id, query, message_id, chat_id]},
-                    {"text": self.strings["show_sensors"], "callback": self.show_section, "args": ["sensors", device_id, query, message_id, chat_id]},
+                    {"text": self.strings["show_comms"], "callback": self.show_section, "args": ["comms", device_id, query, message_id, chat_id, photo_idx]},
+                    {"text": self.strings["show_sensors"], "callback": self.show_section, "args": ["sensors", device_id, query, message_id, chat_id, photo_idx]},
                 ],
                 [
-                    {"text": self.strings["show_misc"], "callback": self.show_section, "args": ["misc", device_id, query, message_id, chat_id]},
+                    {"text": self.strings["show_misc"], "callback": self.show_section, "args": ["misc", device_id, query, message_id, chat_id, photo_idx]},
                 ],
                 [
                     {"text": self.strings["prev_photo"], "callback": self.show_device_info, "args": [device_id, query, message_id, chat_id, max(0, photo_idx - 1), call.id]} if photo_idx > 0 else None,
@@ -378,7 +380,7 @@ class DeviceInfo(loader.Module):
                 disable_web_page_preview=True
             )
 
-    async def show_section(self, call: InlineMessage, section: str, device_id: str, query: str, message_id: int, chat_id: int):
+    async def show_section(self, call: InlineMessage, section: str, device_id: str, query: str, message_id: int, chat_id: int, photo_idx: int):
         """Show a specific section of device info"""
         message = await self._resolve_entity(call, message_id, chat_id)
         
@@ -393,23 +395,46 @@ class DeviceInfo(loader.Module):
             # Truncate for Telegram message limit (4000 chars)
             full_text = full_text[:4000] + ("..." if len(full_text) > 4000 else "")
 
-            await self.inline.form(
-                text=full_text,
-                message=message,
-                reply_markup=[
-                    [{"text": self.strings["back"], "callback": self.show_device_info, "args": [device_id, query, message_id, chat_id, 0, None]}]
-                ],
-                ttl=300,
-                force_me=True,
-                silent=True
-            )
+            # Buttons for returning to device info
+            buttons = [
+                [{"text": self.strings["back_to_device"], "callback": self.show_device_info, "args": [device_id, query, message_id, chat_id, photo_idx, call.id]}]
+            ]
+
+            # Try to edit the message
+            try:
+                logger.debug(f"DeviceInfo: Editing message for section: {section}, call_id: {call.id}")
+                await call.edit(
+                    text=full_text,
+                    reply_markup=buttons,
+                    photo=None,  # Sections don't include photos to avoid media/text mismatch
+                    disable_web_page_preview=True
+                )
+            except Exception as edit_error:
+                logger.warning(f"DeviceInfo: Failed to edit message for section {section}: {edit_error}")
+                # Fallback to new inline form if edit fails
+                await self.inline.form(
+                    text=full_text,
+                    message=message,
+                    reply_markup=buttons,
+                    ttl=300,
+                    force_me=True,
+                    silent=True
+                )
         except Exception as e:
             logger.error(f"DeviceInfo: Failed to show section {section}: {e}")
-            await self.inline.form(
-                text=self.strings["error"].format(str(e)),
-                message=message,
-                silent=True
-            )
+            try:
+                await call.edit(
+                    text=self.strings["error"].format(str(e)),
+                    reply_markup=[],
+                    disable_web_page_preview=True
+                )
+            except Exception as edit_error:
+                logger.warning(f"DeviceInfo: Failed to edit error message: {edit_error}")
+                await self.inline.form(
+                    text=self.strings["error"].format(str(e)),
+                    message=message,
+                    silent=True
+                )
 
     async def back_to_search(self, call: InlineMessage, query: str, message_id: int, chat_id: int):
         """Handle 'Back' button to return to search results"""
@@ -418,30 +443,55 @@ class DeviceInfo(loader.Module):
         try:
             devices = await self._fetch_json("search", {"q": query, "message": message})
             if not devices:  
-                await self.inline.form(
-                    text=self.strings["no_results"].format(query),
-                    message=message,
-                    silent=True
-                )
+                try:
+                    await call.edit(
+                        text=self.strings["no_results"].format(query),
+                        reply_markup=[],
+                        disable_web_page_preview=True
+                    )
+                except Exception as edit_error:
+                    logger.warning(f"DeviceInfo: Failed to edit no_results message: {edit_error}")
+                    await self.inline.form(
+                        text=self.strings["no_results"].format(query),
+                        message=message,
+                        silent=True
+                    )
                 return
 
             devices = devices[:self.config["max_results"]]
-            await self.inline.list(
-                message=message_id,
-                strings=[self.strings["device_list"].format(len(devices), query)],
-                custom_buttons=[
-                    [{"text": device["name"], "callback": self.show_device_info, "args": [device["id"], query, message_id, chat_id, 0, None]}]
-                    for device in devices
-                ],
-                ttl=60,
-                force_me=True,
-                manual_security=True,
-                silent=True
-            )
+            button_rows = [[{"text": device["name"], "callback": self.show_device_info, "args": [device["id"], query, message_id, chat_id, 0, None]}] for device in devices]
+            list_text = self.strings["device_list"].format(len(devices), query)
+
+            try:
+                logger.debug(f"DeviceInfo: Editing message for back_to_search, query: {query}, call_id: {call.id}")
+                await call.edit(
+                    text=list_text,
+                    reply_markup=button_rows,
+                    disable_web_page_preview=True
+                )
+            except Exception as edit_error:
+                logger.warning(f"DeviceInfo: Failed to edit back_to_search message: {edit_error}")
+                await self.inline.list(
+                    message=message_id,
+                    strings=[list_text],
+                    custom_buttons=button_rows,
+                    ttl=60,
+                    force_me=True,
+                    manual_security=True,
+                    silent=True
+                )
         except Exception as e:
             logger.error(f"DeviceInfo: Failed to return to search: {e}")
-            await self.inline.form(
-                text=self.strings["error"].format(str(e)),
-                message=message,
-                silent=True
-            )
+            try:
+                await call.edit(
+                    text=self.strings["error"].format(str(e)),
+                    reply_markup=[],
+                    disable_web_page_preview=True
+                )
+            except Exception as edit_error:
+                logger.warning(f"DeviceInfo: Failed to edit error message: {edit_error}")
+                await self.inline.form(
+                    text=self.strings["error"].format(str(e)),
+                    message=message,
+                    silent=True
+                )
