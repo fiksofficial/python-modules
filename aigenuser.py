@@ -224,7 +224,6 @@ class AiUsernameGen(loader.Module):
         if autocreate and available:
             created = await self.create_channels(available)
 
-        # Один ретрай, если ничего не вышло
         if (autocreate and not created) or (not autocreate and not available):
             retry_prompt = f"{user_query}. Придумай ещё 10 других уникальных username, строго по тем же правилам."
             ai_text_retry = await self._query_ai(retry_prompt)
@@ -235,9 +234,8 @@ class AiUsernameGen(loader.Module):
                 if autocreate:
                     created = await self.create_channels(available_retry)
                 else:
-                    available = available_retry or available  # на случай если и ретрай пустой
+                    available = available_retry or available
 
-        # Финальный вывод — редактируем временное сообщение
         if autocreate:
             if created:
                 channels_list = "\n".join(f"• <code>t.me/{u}</code>" for u in created)
@@ -249,4 +247,4 @@ class AiUsernameGen(loader.Module):
                 avail_list = "\n".join(f"• <code>t.me/{u}</code>" for u in available)
                 await msg.edit(self.strings["available_many"].format(avail_list))
             else:
-                await msg.edit(self.strings["no_free"]
+                await msg.edit(self.strings["no_free"])
