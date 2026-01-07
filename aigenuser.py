@@ -194,7 +194,7 @@ class AiUsernameGen(loader.Module):
                 pass
             return None
 
-    async def _filter_and_validate_usernames(self, ai_text: str) -> list[str]:
+    def _filter_and_validate_usernames(self, ai_text: str) -> list[str]:
         lines = [u.strip() for u in ai_text.splitlines() if u.strip()]
         valid = []
         for u in lines[:10]:
@@ -215,7 +215,7 @@ class AiUsernameGen(loader.Module):
         if not ai_text:
             return await msg.edit(self.strings["error_ai"])
 
-        usernames = await self._filter_and_validate_usernames(ai_text)  # await не нужен, но ок
+        usernames = self._filter_and_validate_usernames(ai_text)
         available = await self.get_available(usernames)
 
         autocreate = self.config["AUTOCREATE_CHANNELS"]
@@ -224,6 +224,7 @@ class AiUsernameGen(loader.Module):
         if autocreate and available:
             created = await self.create_channels(available)
 
+        # Один ретрай, если ничего не вышло
         if (autocreate and not created) or (not autocreate and not available):
             retry_prompt = f"{user_query}. Придумай ещё 10 других уникальных username, строго по тем же правилам."
             ai_text_retry = await self._query_ai(retry_prompt)
@@ -234,19 +235,18 @@ class AiUsernameGen(loader.Module):
                 if autocreate:
                     created = await self.create_channels(available_retry)
                 else:
-                    available = available_retry
+                    available = available_retry or available  # на случай если и ретрай пустой
 
-        await msg.delete()
-
+        # Финальный вывод — редактируем временное сообщение
         if autocreate:
             if created:
                 channels_list = "\n".join(f"• <code>t.me/{u}</code>" for u in created)
-                await utils.answer(message, self.strings["created_many"].format(channels_list))
+                await msg.edit(self.strings["created_many"].format(channels_list))
             else:
-                await utils.answer(message, self.strings["no_free"])
+                await msg.edit(self.strings["no_free"])
         else:
             if available:
                 avail_list = "\n".join(f"• <code>t.me/{u}</code>" for u in available)
-                await utils.answer(message, self.strings["available_many"].format(avail_list))
+                await msg.edit(self.strings["available_many"].format(avail_list))
             else:
-                await utils.answer(message, self.strings["no_free"])
+                await msg.edit(self.strings["no_free"]
