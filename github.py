@@ -1,3 +1,16 @@
+#         ______     ___  ___          _       _      
+#    ____ | ___ \    |  \/  |         | |     | |     
+#   / __ \| |_/ /   _| .  . | ___   __| |_   _| | ___ 
+#  / / _` |  __/ | | | |\/| |/ _ \ / _` | | | | |/ _ \
+# | | (_| | |  | |_| | |  | | (_) | (_| | |_| | |  __/
+#  \ \__,_\_|   \__, \_|  |_/\___/ \__,_|\__,_|_|\___|
+#   \____/       __/ |                                
+#               |___/                                  
+
+# На модуль распространяется лицензия "GNU General Public License v3.0"
+# https://github.com/all-licenses/GNU-General-Public-License-v3.0
+
+# meta developer: @pymodule
 # requires: aiohttp
 
 import contextlib
@@ -34,15 +47,16 @@ EVENT_LABELS = {
     "issues":       "🐛 Issues",
     "pull_request": "🔀 Pull Requests",
     "release":      "🚀 Releases",
+    "star":         "⭐ Stars",
 }
 
 
 @loader.tds
 class GitHubMod(loader.Module):
-    """GitHub repository monitor — commits, issues, PRs and releases"""
+    """GitHub repository monitor — commits, issues, PRs and releases via API polling"""
 
     strings = {
-        "name": "GitHubMonitor",
+        "name": "GitHub",
         "setup_welcome": (
             "🐙 <b>GitHub Monitor</b>\n\n"
             "Choose a destination to configure.\n"
@@ -95,13 +109,7 @@ class GitHubMod(loader.Module):
             "Set a personal token in the destination panel."
         ),
         "dests_list": "📋 <b>Configured destinations:</b>\n\n{list}",
-        "notify_push": (
-            "{e} <b>Push</b> · <a href='https://github.com/{repo}'>{repo}</a>\n"
-            "🌿 <code>{branch}</code> · {count} commit(s)\n\n"
-            "{commits}"
-            "👤 <a href='https://github.com/{pusher}'>{pusher}</a>"
-        ),
-        "notify_push_line": "  · <a href='{url}'><code>{sha}</code></a> {msg}\n",
+# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
         "notify_issue": (
             "{e} <b>Issue {action}</b> · "
             "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
@@ -123,8 +131,51 @@ class GitHubMod(loader.Module):
             "🔗 <a href='{url}'>Open</a>"
         ),
         "_cfg_interval": "Default polling interval in seconds (60–3600). Overridden per destination.",
+        "star_label": "⭐ Stars",
+        "notify_star_added": (
+            "⭐ <b>Star added</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
+            "⭐ Total: <b>{stars}</b>\n"
+            "👤 <a href='https://github.com/{user}'>{user}</a>"
+        ),
+        "notify_star_removed": (
+            "💔 <b>Star removed</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
+            "⭐ Total: <b>{stars}</b>\n"
+            "👤 <a href='https://github.com/{user}'>{user}</a>"
+        ),
+        "notify_push": (
+            "{e} <b>Push</b> · <a href='https://github.com/{repo}'>{repo}</a>\n"
+            "🌿 <code>{branch}</code> · {count} commit(s)\n\n"
+            "{commits}"
+            "👤 <a href='https://github.com/{pusher}'>{pusher}</a>"
+        ),
+        "notify_push_commit": (
+            "<blockquote expandable=\"expandable\">"
+            "<b>Commit <a href='{url}'><code>#{sha}</code></a> "
+            "by <i>{name} (<a href='https://github.com/{login}'>@{login}</a>)</i></b>\n"
+            "<i>{msg}</i>\n\n"
+            "{files_section}"
+            "{diff_section}"
+            "</blockquote>"
+        ),
+        "notify_push_created": "<b>🔧 Created files:</b>\n<code>{files}</code>\n\n",
+        "notify_push_removed": "<b>🗑 Removed files:</b>\n<code>{files}</code>\n\n",
+        "notify_push_modified": "<b>🖊 Modified files:</b>\n<code>{files}</code>\n\n",
+        "notify_push_diff": "<b>⌨️ Diff:</b>\n➕ {added}\n➖ {removed}\n",
+        "notify_push_empty": (
+            "📏 <b>Empty push</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>"
+        ),
+        "notify_push_header": (
+            "📏 <b>Push</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>\n"
+            "{count} commits · <a href='{compare}'>Compare</a>\n\n"
+        ),
+# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
         "_cfg_token": (
             "Default GitHub token for destinations without a personal token.\n"
+
             "Without token: 60 req/h. With token: 5000 req/h.\n"
             "Create at: github.com/settings/tokens"
         ),
@@ -164,8 +215,9 @@ class GitHubMod(loader.Module):
     }
 
     strings_ru = {
-        "name": "GitHubMonitor",
-         "_cls_doc": "Монитор репозитория GitHub — Коммиты, Pull Requests, Issues и Релизы",
+        "name": "GitHub",
+        "_cls_doc": "Мониторинг GitHub репозиториев — коммиты, issues, PR, релизы, звёзды и форки через API polling",
+
         "setup_welcome": (
             "🐙 <b>GitHub Monitor</b>\n\n"
             "Выберите назначение для настройки.\n"
@@ -218,13 +270,7 @@ class GitHubMod(loader.Module):
             "Установите токен в панели назначения."
         ),
         "dests_list": "📋 <b>Настроенные назначения:</b>\n\n{list}",
-        "notify_push": (
-            "{e} <b>Push</b> · <a href='https://github.com/{repo}'>{repo}</a>\n"
-            "🌿 <code>{branch}</code> · {count} коммит(а)\n\n"
-            "{commits}"
-            "👤 <a href='https://github.com/{pusher}'>{pusher}</a>"
-        ),
-        "notify_push_line": "  · <a href='{url}'><code>{sha}</code></a> {msg}\n",
+# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
         "notify_issue": (
             "{e} <b>Issue {action}</b> · "
             "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
@@ -246,8 +292,51 @@ class GitHubMod(loader.Module):
             "🔗 <a href='{url}'>Открыть</a>"
         ),
         "_cfg_interval": "Интервал опроса по умолчанию (60–3600 сек). Переопределяется в настройках назначения.",
+        "star_label": "⭐ Звёзды",
+        "notify_star_added": (
+            "⭐ <b>Звезда добавлена</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
+            "⭐ Всего: <b>{stars}</b>\n"
+            "👤 <a href='https://github.com/{user}'>{user}</a>"
+        ),
+        "notify_star_removed": (
+            "💔 <b>Звезда убрана</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
+            "⭐ Всего: <b>{stars}</b>\n"
+            "👤 <a href='https://github.com/{user}'>{user}</a>"
+        ),
+        "notify_push": (
+            "{e} <b>Push</b> · <a href='https://github.com/{repo}'>{repo}</a>\n"
+            "🌿 <code>{branch}</code> · {count} коммит(а)\n\n"
+            "{commits}"
+            "👤 <a href='https://github.com/{pusher}'>{pusher}</a>"
+        ),
+        "notify_push_commit": (
+            "<blockquote expandable=\"expandable\">"
+            "<b>Коммит <a href='{url}'><code>#{sha}</code></a> "
+            "от <i>{name} (<a href='https://github.com/{login}'>@{login}</a>)</i></b>\n"
+            "<i>{msg}</i>\n\n"
+            "{files_section}"
+            "{diff_section}"
+            "</blockquote>"
+        ),
+        "notify_push_created": "<b>🔧 Созданные файлы:</b>\n<code>{files}</code>\n\n",
+        "notify_push_removed": "<b>🗑 Удалённые файлы:</b>\n<code>{files}</code>\n\n",
+        "notify_push_modified": "<b>🖊 Изменённые файлы:</b>\n<code>{files}</code>\n\n",
+        "notify_push_diff": "<b>⌨️ Diff:</b>\n➕ {added}\n➖ {removed}\n",
+        "notify_push_empty": (
+            "📏 <b>Пустой push</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>"
+        ),
+        "notify_push_header": (
+            "📏 <b>Push</b> · "
+            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>\n"
+            "{count} коммитов · <a href='{compare}'>Сравнить</a>\n\n"
+        ),
+# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
         "_cfg_token": (
             "Глобальный GitHub-токен для назначений без персонального токена.\n"
+
             "Без токена: 60 запросов/час. С токеном: 5000.\n"
             "Создать: github.com/settings/tokens"
         ),
@@ -405,11 +494,11 @@ class GitHubMod(loader.Module):
         return True, ""
 
 
-    async def _api_get(self, path: str, chat_id_str: str) -> tuple[list | dict | None, bool]:
+    async def _api_get(self, path: str, chat_id_str: str, extra_headers: dict | None = None) -> tuple[list | dict | None, bool]:
         url = f"{GITHUB_API}{path}"
         session = self._get_session(chat_id_str)
         try:
-            async with session.get(url) as resp:
+            async with session.get(url, headers=extra_headers) as resp:
                 if resp.status in (403, 429):
                     reset = int(resp.headers.get("X-RateLimit-Reset", 0))
                     dt = datetime.fromtimestamp(reset).strftime("%H:%M:%S") if reset else "?"
@@ -465,28 +554,82 @@ class GitHubMod(loader.Module):
             ) > since_dt
         ]
 
+    async def _fetch_stargazers(self, repo: str, since: str, cid: str) -> list:
+        data, _ = await self._api_get(
+            f"/repos/{repo}/stargazers?per_page=20", cid,
+            extra_headers={"Accept": "application/vnd.github.star+json"},
+        )
+        if not isinstance(data, list):
+            return []
+        since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        result = []
+        for item in data:
+            starred_at = item.get("starred_at") or "1970-01-01T00:00:00Z"
+            if datetime.fromisoformat(starred_at.replace("Z", "+00:00")) > since_dt:
+                result.append({
+                    "action": "created",
+                    "sender": item.get("user", {}),
+                    "repository": {"stargazers_count": "?"},
+                })
+        return result
 
-    def _fmt_push(self, repo: str, commits: list) -> list[str]:
-        msgs = []
-        for c in reversed(commits):
+
+    def _fmt_push(self, repo: str, commits: list, compare_url: str = "") -> list[str]:
+        if not commits:
+            branch = ""
+            return [self.strings("notify_push_empty").format(repo=repo, branch=branch)]
+
+        branch = "main"
+        first = commits[0] if commits else {}
+        if first.get("html_url"):
+            parts = first["html_url"].split("/")
+            if "commit" in parts:
+                idx = parts.index("commit")
+                branch = parts[idx - 1] if idx > 0 else "main"
+
+        commit_blocks = []
+        for c in commits:
             commit = c.get("commit", {})
-            author = (c.get("author") or {}).get("login") or commit.get("author", {}).get("name", "unknown")
-            branch = "main"
-            if c.get("html_url"):
-                parts = c["html_url"].split("/")
-                if "commit" in parts:
-                    idx = parts.index("commit")
-                    branch = parts[idx - 1] if idx > 0 else "main"
-            msgs.append(self.strings("notify_push").format(
-                e=E["push"], repo=repo, branch=branch, count=1,
-                commits=self.strings("notify_push_line").format(
-                    url=c.get("html_url", "#"),
-                    sha=c.get("sha", "")[:7],
-                    msg=commit.get("message", "").split("\n")[0][:80],
-                ),
-                pusher=author,
+            login = (c.get("author") or {}).get("login", "")
+            name = commit.get("author", {}).get("name", login or "unknown")
+            sha = c.get("sha", "")[:7]
+            url = c.get("html_url", "#")
+            msg = commit.get("message", "").split("\n")[0][:120]
+
+            files_section = ""
+            diff_section = ""
+            stats = c.get("stats", {})
+            files = c.get("files", [])
+            if files:
+                created = [f["filename"] for f in files if f.get("status") == "added"]
+                removed = [f["filename"] for f in files if f.get("status") == "removed"]
+                modified = [f["filename"] for f in files if f.get("status") == "modified"]
+                if created:
+                    files_section += self.strings("notify_push_created").format(files="\n".join(created))
+                if removed:
+                    files_section += self.strings("notify_push_removed").format(files="\n".join(removed))
+                if modified:
+                    files_section += self.strings("notify_push_modified").format(files="\n".join(modified))
+            if stats.get("additions") or stats.get("deletions"):
+                diff_section = self.strings("notify_push_diff").format(
+                    added=stats.get("additions", 0),
+                    removed=stats.get("deletions", 0),
+                )
+            commit_blocks.append(self.strings("notify_push_commit").format(
+                url=url, sha=sha, name=name, login=login or name,
+                msg=msg, files_section=files_section, diff_section=diff_section,
             ))
-        return msgs
+
+        header = self.strings("notify_push_header").format(
+            repo=repo, branch=branch, count=len(commits), compare=compare_url or f"https://github.com/{repo}/commits/{branch}",
+        )
+        pusher = (commits[0].get("author") or {}).get("login", "") if commits else ""
+        body = self.strings("notify_push").format(
+            e=E["push"], repo=repo, branch=branch, count=len(commits),
+            commits="\n".join(commit_blocks),
+            pusher=pusher,
+        )
+        return [header + body]
 
     def _fmt_issues(self, repo: str, issues: list) -> list[str]:
         return [
@@ -539,6 +682,16 @@ class GitHubMod(loader.Module):
         ]
 
 
+    def _fmt_star(self, repo: str, stars_data: list) -> list[str]:
+        msgs = []
+        for s in stars_data:
+            action = s.get("action", "created")
+            user = (s.get("sender") or {}).get("login", "unknown")
+            stars = (s.get("repository") or {}).get("stargazers_count", "?")
+            key = "notify_star_added" if action == "created" else "notify_star_removed"
+            msgs.append(self.strings(key).format(repo=repo, stars=stars, user=user))
+        return msgs
+
     @loader.loop(autostart=True, wait_before=True)
     async def poller(self):
         dests = self._get_dests()
@@ -585,6 +738,10 @@ class GitHubMod(loader.Module):
                 r = await self._fetch_releases(repo, since, cid_str)
                 if r:
                     messages += self._fmt_releases(repo, r)
+            if "star" in events:
+                s = await self._fetch_stargazers(repo, since, cid_str)
+                if s:
+                    messages += self._fmt_star(repo, s)
 
         for text in messages:
             try:
@@ -851,4 +1008,5 @@ class GitHubMod(loader.Module):
     async def githubcmd(self, message: Message):
         """- Open GitHub Monitor control panel"""
         await self._render_main_menu(message)
+
 
