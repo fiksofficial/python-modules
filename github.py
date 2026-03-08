@@ -165,7 +165,7 @@ class GitHubMod(loader.Module):
 
     strings_ru = {
         "name": "GitHubMonitor",
-         "_cls_doc": "Монитор репозитория GitHub — Коммиты, Pull Requests, Issues и Релизы"
+         "_cls_doc": "Монитор репозитория GitHub — Коммиты, Pull Requests, Issues и Релизы",
         "setup_welcome": (
             "🐙 <b>GitHub Monitor</b>\n\n"
             "Выберите назначение для настройки.\n"
