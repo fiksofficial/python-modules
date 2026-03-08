@@ -53,7 +53,7 @@ EVENT_LABELS = {
 
 @loader.tds
 class GitHubMod(loader.Module):
-    """GitHub repository monitor — commits, issues, PRs and releases via API polling"""
+    """GitHub repository monitor — commits, issues, PRs and releases"""
 
     strings = {
         "name": "GitHubMonitor",
@@ -216,7 +216,7 @@ class GitHubMod(loader.Module):
 
     strings_ru = {
         "name": "GitHubMonitor",
-        "_cls_doc": "Мониторинг GitHub репозиториев — коммиты, issues, PR, релизы, звёзды и форки через API polling",
+        "_cls_doc": "Мониторинг GitHub репозиториев — коммиты, issues, PR, релизы, звёзды и форки",
 
         "setup_welcome": (
             "🐙 <b>GitHub Monitor</b>\n\n"
