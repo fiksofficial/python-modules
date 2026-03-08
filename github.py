@@ -519,8 +519,31 @@ class GitHubMod(loader.Module):
         return data is not None, rl
 
     async def _fetch_commits(self, repo: str, since: str, cid: str) -> list:
+        # List commits since last check (returns sha, html_url, commit.message, author — but NO stats/files)
         data, _ = await self._api_get(f"/repos/{repo}/commits?since={since}&per_page=5", cid)
-        return data if isinstance(data, list) else []
+        if not isinstance(data, list) or not data:
+            return []
+        # Enrich each commit with stats+files by fetching individually
+        enriched = []
+        for c in data:
+            sha = c.get("sha", "")
+            if not sha:
+                enriched.append(c)
+                continue
+            detail, _ = await self._api_get(f"/repos/{repo}/commits/{sha}", cid)
+            enriched.append(detail if isinstance(detail, dict) else c)
+        return enriched
+
+    async def _fetch_branch_for_commit(self, repo: str, sha: str, cid: str) -> str:
+        """Find the branch name that contains this commit SHA."""
+        data, _ = await self._api_get(f"/repos/{repo}/branches", cid)
+        if not isinstance(data, list):
+            return "main"
+        # Check each branch's latest commit — fast path for small repos
+        for b in data:
+            if (b.get("commit") or {}).get("sha", "") == sha:
+                return b.get("name", "main")
+        return (data[0].get("name", "main")) if data else "main"
 
     async def _fetch_issues(self, repo: str, since: str, cid: str) -> list:
         data, _ = await self._api_get(
@@ -574,17 +597,9 @@ class GitHubMod(loader.Module):
         return result
 
 
-    def _fmt_push(self, repo: str, commits: list, compare_url: str = "") -> list[str]:
+    def _fmt_push(self, repo: str, commits: list, branch: str = "main", compare_url: str = "") -> list[str]:
         if not commits:
-            return [self.strings("notify_push_empty").format(repo=repo, branch="")]
-
-        branch = "main"
-        first = commits[0] if commits else {}
-        if first.get("html_url"):
-            parts = first["html_url"].split("/")
-            if "commit" in parts:
-                idx = parts.index("commit")
-                branch = parts[idx - 1] if idx > 0 else "main"
+            return [self.strings("notify_push_empty").format(repo=repo, branch=branch)]
 
         commit_blocks = []
         for c in commits:
@@ -619,12 +634,18 @@ class GitHubMod(loader.Module):
                 msg=msg, files_section=files_section, diff_section=diff_section,
             ))
 
-        pusher = (commits[0].get("author") or {}).get("login", "") if commits else ""
-        compare = compare_url or f"https://github.com/{repo}/commits/{branch}"
+        pusher = (commits[-1].get("author") or {}).get("login", "") if commits else ""
+        # Build compare URL: oldest_sha...newest_sha (GitHub shows diff between them)
+        if not compare_url and len(commits) >= 2:
+            old_sha = commits[0].get("parents", [{}])[0].get("sha", commits[0].get("sha", ""))[:12]
+            new_sha = commits[-1].get("sha", "")[:12]
+            compare_url = f"https://github.com/{repo}/compare/{old_sha}...{new_sha}"
+        elif not compare_url:
+            compare_url = commits[-1].get("html_url", f"https://github.com/{repo}")
 
         msg = self.strings("notify_push_header").format(
-            e=E["push"], repo=repo, branch=branch,
-            count=len(commits), compare=compare,
+            repo=repo, branch=branch,
+            count=len(commits), compare=compare_url,
         )
         msg += "".join(commit_blocks)
         msg += self.strings("notify_push_footer").format(login=pusher)
@@ -725,7 +746,9 @@ class GitHubMod(loader.Module):
             if "push" in events:
                 c = await self._fetch_commits(repo, since, cid_str)
                 if c:
-                    messages += self._fmt_push(repo, c)
+                    newest_sha = c[-1].get("sha", "")
+                    branch = await self._fetch_branch_for_commit(repo, newest_sha, cid_str)
+                    messages += self._fmt_push(repo, c, branch=branch)
             if "issues" in events:
                 i = await self._fetch_issues(repo, since, cid_str)
                 if i:
