@@ -614,6 +614,7 @@ class GitHubMod(loader.Module):
                     removed=stats.get("deletions", 0),
                 )
             commit_blocks.append(self.strings("notify_push_commit").format(
+                url=c.get("html_url", "#"),
                 sha=sha, name=name, login=login or name,
                 msg=msg, files_section=files_section, diff_section=diff_section,
             ))
