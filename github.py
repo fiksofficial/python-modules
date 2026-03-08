@@ -56,7 +56,7 @@ class GitHubMod(loader.Module):
     """GitHub repository monitor — commits, issues, PRs and releases via API polling"""
 
     strings = {
-        "name": "GitHub",
+        "name": "GitHubMonitor",
         "setup_welcome": (
             "🐙 <b>GitHub Monitor</b>\n\n"
             "Choose a destination to configure.\n"
@@ -215,7 +215,7 @@ class GitHubMod(loader.Module):
     }
 
     strings_ru = {
-        "name": "GitHub",
+        "name": "GitHubMonitor",
         "_cls_doc": "Мониторинг GitHub репозиториев — коммиты, issues, PR, релизы, звёзды и форки через API polling",
 
         "setup_welcome": (
