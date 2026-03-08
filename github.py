@@ -53,7 +53,7 @@ EVENT_LABELS = {
 
 @loader.tds
 class GitHubMod(loader.Module):
-    """GitHub repository monitor — commits, issues, PRs and releases"""
+    """GitHub repository monitor — commits, issues, PRs, releases and stars"""
 
     strings = {
         "name": "GitHubMonitor",
@@ -109,70 +109,70 @@ class GitHubMod(loader.Module):
             "Set a personal token in the destination panel."
         ),
         "dests_list": "📋 <b>Configured destinations:</b>\n\n{list}",
-# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
-        "notify_issue": (
-            "{e} <b>Issue {action}</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "📌 <a href='{url}'><b>#{num} {title}</b></a>\n"
-            "👤 <a href='https://github.com/{author}'>{author}</a>"
-        ),
-        "notify_pr": (
-            "{e} <b>PR {action}</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "📌 <a href='{url}'><b>#{num} {title}</b></a>\n"
-            "🌿 <code>{head}</code> → <code>{base}</code>\n"
-            "👤 <a href='https://github.com/{author}'>{author}</a>"
-        ),
-        "notify_release": (
-            "{e} <b>Release {action}</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "🏷 <code>{tag}</code>  <b>{name}</b>\n"
-            "👤 <a href='https://github.com/{author}'>{author}</a>\n"
-            "🔗 <a href='{url}'>Open</a>"
-        ),
-        "_cfg_interval": "Default polling interval in seconds (60–3600). Overridden per destination.",
-        "star_label": "⭐ Stars",
-        "notify_star_added": (
-            "⭐ <b>Star added</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "⭐ Total: <b>{stars}</b>\n"
-            "👤 <a href='https://github.com/{user}'>{user}</a>"
-        ),
-        "notify_star_removed": (
-            "💔 <b>Star removed</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "⭐ Total: <b>{stars}</b>\n"
-            "👤 <a href='https://github.com/{user}'>{user}</a>"
-        ),
-        "notify_push": (
-            "{e} <b>Push</b> · <a href='https://github.com/{repo}'>{repo}</a>\n"
-            "🌿 <code>{branch}</code> · {count} commit(s)\n\n"
-            "{commits}"
-            "👤 <a href='https://github.com/{pusher}'>{pusher}</a>"
+        "notify_push_header": (
+            "<b>📏 On </b>"
+            "<a href='https://github.com/{repo}'><b>{repo}:{branch}</b></a>"
+            "<b> new commits!</b>\n"
+            "{count} commits pushed.\n"
+            "<a href='{compare}'>Compare changes</a>"
         ),
         "notify_push_commit": (
-            "<blockquote expandable=\"expandable\">"
-            "<b>Commit <a href='{url}'><code>#{sha}</code></a> "
-            "by <i>{name} (<a href='https://github.com/{login}'>@{login}</a>)</i></b>\n"
+            "\n<blockquote expandable><b>Commit </b>"
+            "<a href='{url}'><b>#{sha}</b></a>"
+            "<b> by <i>{name} (</i></b>"
+            "<a href='https://github.com/{login}'><b><i>@{login}</i></b></a>"
+            "<b><i>)</i></b>\n"
             "<i>{msg}</i>\n\n"
             "{files_section}"
             "{diff_section}"
             "</blockquote>"
         ),
+        "notify_push_footer": "",
         "notify_push_created": "<b>🔧 Created files:</b>\n<code>{files}</code>\n\n",
         "notify_push_removed": "<b>🗑 Removed files:</b>\n<code>{files}</code>\n\n",
         "notify_push_modified": "<b>🖊 Modified files:</b>\n<code>{files}</code>\n\n",
         "notify_push_diff": "<b>⌨️ Diff:</b>\n➕ {added}\n➖ {removed}\n",
         "notify_push_empty": (
-            "📏 <b>Empty push</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>"
+            "<b>📏 On </b>"
+            "<a href='https://github.com/{repo}'><b>{repo}:{branch}</b></a>"
+            "<b> new empty push</b>"
         ),
-        "notify_push_header": (
-            "📏 <b>Push</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>\n"
-            "{count} commits · <a href='{compare}'>Compare</a>\n\n"
+        "notify_issue": (
+            "<b>{e} On </b><a href='{url}'><b>{repo}</b></a>"
+            "<b> {action} issue!</b>\n\n"
+            "<i>{title}</i>\n"
+            "<a href='{url}'>#{num}</a> by "
+            "<a href='https://github.com/{author}'><i>@{author}</i></a>"
         ),
-# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
+        "notify_pr": (
+            "<b>{e} On </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> {action} pull request!</b>\n\n"
+            "<i>{title}</i>\n"
+            "<blockquote expandable>{body}</blockquote>\n\n"
+            "User: <a href='https://github.com/{author}'><i>@{author}</i></a>\n\n"
+            "<a href='{url}'>#{num}</a>"
+        ),
+        "notify_release": (
+            "<b>{e} On </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> {action} release!</b>\n\n"
+            "🏷 <code>{tag}</code> · <b>{name}</b>\n"
+            "👤 <a href='https://github.com/{author}'><i>@{author}</i></a>\n"
+            "<a href='{url}'>Open release</a>"
+        ),
+        "notify_star_added": (
+            "<b>⭐️ On </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> added star!</b>\n\n"
+            "Total stars: <i>{stars}</i>\n"
+            "User: <a href='https://github.com/{user}'><i>@{user}</i></a>"
+        ),
+        "notify_star_removed": (
+            "<b>💔 On </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> removed star!</b>\n\n"
+            "Total stars: <i>{stars}</i>\n"
+            "User: <a href='https://github.com/{user}'><i>@{user}</i></a>"
+        ),
+        "_cfg_interval": "Default polling interval in seconds (60–3600). Overridden per destination.",
+        "star_label": "⭐ Stars",
         "_cfg_token": (
             "Default GitHub token for destinations without a personal token.\n"
 
@@ -216,7 +216,7 @@ class GitHubMod(loader.Module):
 
     strings_ru = {
         "name": "GitHubMonitor",
-        "_cls_doc": "Мониторинг GitHub репозиториев — коммиты, issues, PR, релизы, звёзды и форки",
+        "_cls_doc": "Мониторинг GitHub репозиториев — коммиты, issues, PR, релизы и звёзды",
 
         "setup_welcome": (
             "🐙 <b>GitHub Monitor</b>\n\n"
@@ -270,70 +270,70 @@ class GitHubMod(loader.Module):
             "Установите токен в панели назначения."
         ),
         "dests_list": "📋 <b>Настроенные назначения:</b>\n\n{list}",
-# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
-        "notify_issue": (
-            "{e} <b>Issue {action}</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "📌 <a href='{url}'><b>#{num} {title}</b></a>\n"
-            "👤 <a href='https://github.com/{author}'>{author}</a>"
-        ),
-        "notify_pr": (
-            "{e} <b>PR {action}</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "📌 <a href='{url}'><b>#{num} {title}</b></a>\n"
-            "🌿 <code>{head}</code> → <code>{base}</code>\n"
-            "👤 <a href='https://github.com/{author}'>{author}</a>"
-        ),
-        "notify_release": (
-            "{e} <b>Release {action}</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "🏷 <code>{tag}</code>  <b>{name}</b>\n"
-            "👤 <a href='https://github.com/{author}'>{author}</a>\n"
-            "🔗 <a href='{url}'>Открыть</a>"
-        ),
-        "_cfg_interval": "Интервал опроса по умолчанию (60–3600 сек). Переопределяется в настройках назначения.",
-        "star_label": "⭐ Звёзды",
-        "notify_star_added": (
-            "⭐ <b>Звезда добавлена</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "⭐ Всего: <b>{stars}</b>\n"
-            "👤 <a href='https://github.com/{user}'>{user}</a>"
-        ),
-        "notify_star_removed": (
-            "💔 <b>Звезда убрана</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>\n\n"
-            "⭐ Всего: <b>{stars}</b>\n"
-            "👤 <a href='https://github.com/{user}'>{user}</a>"
-        ),
-        "notify_push": (
-            "{e} <b>Push</b> · <a href='https://github.com/{repo}'>{repo}</a>\n"
-            "🌿 <code>{branch}</code> · {count} коммит(а)\n\n"
-            "{commits}"
-            "👤 <a href='https://github.com/{pusher}'>{pusher}</a>"
+        "notify_push_header": (
+            "<b>📏 На </b>"
+            "<a href='https://github.com/{repo}'><b>{repo}:{branch}</b></a>"
+            "<b> новые коммиты!</b>\n"
+            "{count} коммитов отправлено.\n"
+            "<a href='{compare}'>Сравнить изменения</a>"
         ),
         "notify_push_commit": (
-            "<blockquote expandable=\"expandable\">"
-            "<b>Коммит <a href='{url}'><code>#{sha}</code></a> "
-            "от <i>{name} (<a href='https://github.com/{login}'>@{login}</a>)</i></b>\n"
+            "\n<blockquote expandable><b>Коммит </b>"
+            "<a href='{url}'><b>#{sha}</b></a>"
+            "<b> от <i>{name} (</i></b>"
+            "<a href='https://github.com/{login}'><b><i>@{login}</i></b></a>"
+            "<b><i>)</i></b>\n"
             "<i>{msg}</i>\n\n"
             "{files_section}"
             "{diff_section}"
             "</blockquote>"
         ),
+        "notify_push_footer": "",
         "notify_push_created": "<b>🔧 Созданные файлы:</b>\n<code>{files}</code>\n\n",
         "notify_push_removed": "<b>🗑 Удалённые файлы:</b>\n<code>{files}</code>\n\n",
         "notify_push_modified": "<b>🖊 Изменённые файлы:</b>\n<code>{files}</code>\n\n",
         "notify_push_diff": "<b>⌨️ Diff:</b>\n➕ {added}\n➖ {removed}\n",
         "notify_push_empty": (
-            "📏 <b>Пустой push</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>"
+            "<b>📏 На </b>"
+            "<a href='https://github.com/{repo}'><b>{repo}:{branch}</b></a>"
+            "<b> пустой push</b>"
         ),
-        "notify_push_header": (
-            "📏 <b>Push</b> · "
-            "<a href='https://github.com/{repo}'>{repo}</a>:<code>{branch}</code>\n"
-            "{count} коммитов · <a href='{compare}'>Сравнить</a>\n\n"
+        "notify_issue": (
+            "<b>{e} На </b><a href='{url}'><b>{repo}</b></a>"
+            "<b> {action} issue!</b>\n\n"
+            "<i>{title}</i>\n"
+            "<a href='{url}'>#{num}</a> от "
+            "<a href='https://github.com/{author}'><i>@{author}</i></a>"
         ),
-# ---------- Позаимствовал данные строки из https://github.com/vsecoder/github-notifi-bot ----------
+        "notify_pr": (
+            "<b>{e} На </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> {action} pull request!</b>\n\n"
+            "<i>{title}</i>\n"
+            "<blockquote expandable>{body}</blockquote>\n\n"
+            "Пользователь: <a href='https://github.com/{author}'><i>@{author}</i></a>\n\n"
+            "<a href='{url}'>#{num}</a>"
+        ),
+        "notify_release": (
+            "<b>{e} На </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> {action} релиз!</b>\n\n"
+            "🏷 <code>{tag}</code> · <b>{name}</b>\n"
+            "👤 <a href='https://github.com/{author}'><i>@{author}</i></a>\n"
+            "<a href='{url}'>Открыть релиз</a>"
+        ),
+        "notify_star_added": (
+            "<b>⭐️ На </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> добавлена звезда!</b>\n\n"
+            "Всего звёзд: <i>{stars}</i>\n"
+            "Пользователь: <a href='https://github.com/{user}'><i>@{user}</i></a>"
+        ),
+        "notify_star_removed": (
+            "<b>💔 На </b><a href='https://github.com/{repo}'><b>{repo}</b></a>"
+            "<b> убрана звезда!</b>\n\n"
+            "Всего звёзд: <i>{stars}</i>\n"
+            "Пользователь: <a href='https://github.com/{user}'><i>@{user}</i></a>"
+        ),
+        "_cfg_interval": "Интервал опроса по умолчанию (60–3600 сек). Переопределяется в настройках назначения.",
+        "star_label": "⭐ Звёзды",
         "_cfg_token": (
             "Глобальный GitHub-токен для назначений без персонального токена.\n"
 
@@ -576,8 +576,7 @@ class GitHubMod(loader.Module):
 
     def _fmt_push(self, repo: str, commits: list, compare_url: str = "") -> list[str]:
         if not commits:
-            branch = ""
-            return [self.strings("notify_push_empty").format(repo=repo, branch=branch)]
+            return [self.strings("notify_push_empty").format(repo=repo, branch="")]
 
         branch = "main"
         first = commits[0] if commits else {}
@@ -593,7 +592,6 @@ class GitHubMod(loader.Module):
             login = (c.get("author") or {}).get("login", "")
             name = commit.get("author", {}).get("name", login or "unknown")
             sha = c.get("sha", "")[:7]
-            url = c.get("html_url", "#")
             msg = commit.get("message", "").split("\n")[0][:120]
 
             files_section = ""
@@ -602,12 +600,12 @@ class GitHubMod(loader.Module):
             files = c.get("files", [])
             if files:
                 created = [f["filename"] for f in files if f.get("status") == "added"]
-                removed = [f["filename"] for f in files if f.get("status") == "removed"]
+                removed_f = [f["filename"] for f in files if f.get("status") == "removed"]
                 modified = [f["filename"] for f in files if f.get("status") == "modified"]
                 if created:
                     files_section += self.strings("notify_push_created").format(files="\n".join(created))
-                if removed:
-                    files_section += self.strings("notify_push_removed").format(files="\n".join(removed))
+                if removed_f:
+                    files_section += self.strings("notify_push_removed").format(files="\n".join(removed_f))
                 if modified:
                     files_section += self.strings("notify_push_modified").format(files="\n".join(modified))
             if stats.get("additions") or stats.get("deletions"):
@@ -616,20 +614,20 @@ class GitHubMod(loader.Module):
                     removed=stats.get("deletions", 0),
                 )
             commit_blocks.append(self.strings("notify_push_commit").format(
-                url=url, sha=sha, name=name, login=login or name,
+                sha=sha, name=name, login=login or name,
                 msg=msg, files_section=files_section, diff_section=diff_section,
             ))
 
-        header = self.strings("notify_push_header").format(
-            repo=repo, branch=branch, count=len(commits), compare=compare_url or f"https://github.com/{repo}/commits/{branch}",
-        )
         pusher = (commits[0].get("author") or {}).get("login", "") if commits else ""
-        body = self.strings("notify_push").format(
-            e=E["push"], repo=repo, branch=branch, count=len(commits),
-            commits="\n".join(commit_blocks),
-            pusher=pusher,
+        compare = compare_url or f"https://github.com/{repo}/commits/{branch}"
+
+        msg = self.strings("notify_push_header").format(
+            e=E["push"], repo=repo, branch=branch,
+            count=len(commits), compare=compare,
         )
-        return [header + body]
+        msg += "".join(commit_blocks)
+        msg += self.strings("notify_push_footer").format(login=pusher)
+        return [msg]
 
     def _fmt_issues(self, repo: str, issues: list) -> list[str]:
         return [
@@ -656,13 +654,14 @@ class GitHubMod(loader.Module):
                 e_key, action = "pr_close", self.strings("pr_closed")
             else:
                 e_key, action = "pr_open", self.strings("pr_opened")
+            raw_body = pr.get("body") or ""
+            body = (raw_body[:200] + "...") if len(raw_body) > 200 else raw_body
             msgs.append(self.strings("notify_pr").format(
                 e=E[e_key], action=action, repo=repo,
                 url=pr.get("html_url", "#"),
                 num=pr.get("number", "?"),
                 title=pr.get("title", "")[:100],
-                head=(pr.get("head") or {}).get("ref", "?"),
-                base=(pr.get("base") or {}).get("ref", "?"),
+                body=body,
                 author=(pr.get("user") or {}).get("login", "unknown"),
             ))
         return msgs
@@ -1008,5 +1007,4 @@ class GitHubMod(loader.Module):
     async def githubcmd(self, message: Message):
         """- Open GitHub Monitor control panel"""
         await self._render_main_menu(message)
-
 
