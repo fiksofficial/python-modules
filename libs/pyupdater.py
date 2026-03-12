@@ -20,7 +20,7 @@ import logging
 import re
 import time
 
-from .. import loader, utils
+from .. import loader
 
 logger = logging.getLogger(__name__)
 
@@ -61,13 +61,10 @@ class PyUpdaterLib(loader.Library):
     version = (1, 0, 0)
 
     async def init(self):
-        await self._ensure_token()
+        await self._refresh_token()
 
-    async def _ensure_token(self):
-        existing = self._lib_get(TOKEN_DB_KEY, "")
-        if existing and existing.startswith(TOKEN_PREFIX):
-            return
-
+    async def _refresh_token(self):
+        """Каждый раз при загрузке библиотеки запрашивает свежий токен у бота."""
         try:
             sent = await self.client.send_message(BOT_USERNAME, "/token")
 
@@ -89,7 +86,7 @@ class PyUpdaterLib(loader.Library):
                 return
 
             self._lib_set(TOKEN_DB_KEY, response.text.strip())
-            logger.info("PyUpdater: токен получен и сохранён")
+            logger.info("PyUpdater: токен обновлён")
 
             async def _cleanup():
                 await asyncio.sleep(3)
