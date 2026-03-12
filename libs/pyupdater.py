@@ -20,18 +20,19 @@ import logging
 import re
 import time
 
-import aiohttp
-
-from .. import loader
+from .. import loader, utils
 
 logger = logging.getLogger(__name__)
 
 BLOB_RE = re.compile(r"https://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)")
 RAW_RE  = re.compile(r"https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)")
 
-API_BASE     = "37a5bcc11453.vps.myjino.ru"
+API_BASE     = "https://37a5bcc11453.vps.myjino.ru"
 BOT_USERNAME = "pyupdater_bot"
 GITHUB_TOKEN = ""
+
+TOKEN_DB_KEY = "user_token"
+TOKEN_PREFIX = "pyut_"
 
 
 def _parse(url: str):
@@ -56,12 +57,52 @@ def _sign(secret_key: str, api_key: str) -> str:
 
 
 class PyUpdaterLib(loader.Library):
-
-    developer = "@pymodule"
+    developer = "@pyupdater"
     version = (1, 0, 0)
 
     async def init(self):
-        pass
+        await self._ensure_token()
+
+    async def _ensure_token(self):
+        existing = self._lib_get(TOKEN_DB_KEY, "")
+        if existing and existing.startswith(TOKEN_PREFIX):
+            return
+
+        try:
+            sent = await self.client.send_message(BOT_USERNAME, "/token")
+
+            response = None
+            for _ in range(20):
+                await asyncio.sleep(0.5)
+                msgs = await self.client.get_messages(BOT_USERNAME, limit=1)
+                if (
+                    msgs
+                    and msgs[0].id != sent.id
+                    and msgs[0].text
+                    and msgs[0].text.startswith(TOKEN_PREFIX)
+                ):
+                    response = msgs[0]
+                    break
+
+            if response is None:
+                logger.warning("PyUpdater: не получили токен от бота")
+                return
+
+            self._lib_set(TOKEN_DB_KEY, response.text.strip())
+            logger.info("PyUpdater: токен получен и сохранён")
+
+            async def _cleanup():
+                await asyncio.sleep(3)
+                try:
+                    await sent.delete()
+                    await response.delete()
+                except Exception:
+                    pass
+
+            asyncio.create_task(_cleanup())
+
+        except Exception:
+            logger.exception("PyUpdater: ошибка при получении токена")
 
     async def check(
         self,
@@ -78,9 +119,8 @@ class PyUpdaterLib(loader.Library):
         owner, repo, branch, path = parts
         module_name = module.strings["name"]
 
-        asyncio.create_task(self._ensure_token(module))
-
-        asyncio.create_task(self._ping(api_key, secret_key, module.tg_id, module_name, module))
+        asyncio.create_task(self._ping(api_key, secret_key, module.tg_id, module_name))
+        asyncio.create_task(self._maybe_confirm_test(api_key, module.tg_id))
 
         commits_url = (
             f"https://api.github.com/repos/{owner}/{repo}/commits"
@@ -91,6 +131,7 @@ class PyUpdaterLib(loader.Library):
         saved_sha: str = module._db.get(module_name, db_key, "")
 
         try:
+            import aiohttp
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     commits_url,
@@ -126,51 +167,43 @@ class PyUpdaterLib(loader.Library):
             return
 
         module._db.set(module_name, db_key, latest_sha)
-        logger.info("PyUpdater: reloading %s (%s)", module_name, latest_sha[:7])
+        logger.info("PyUpdater: reloading %s (commit %s)", module_name, latest_sha[:7])
 
-        loader_mod = self.lookup("loader")
-        if not loader_mod:
-            logger.error("PyUpdater: LoaderMod not found via lookup")
+        loader_mod = next(
+            (m for m in module.allmodules.modules if m.__class__.__name__ == "LoaderMod"),
+            None,
+        )
+        if loader_mod is None:
+            logger.error("PyUpdater: LoaderMod not found")
             return
 
         asyncio.create_task(loader_mod.load_module(new_code, None, save_fs=True))
 
-    async def _ensure_token(self, module: loader.Module) -> None:
-        existing = self._lib_get("user_token", "")
-        if existing:
-            return
-
+    async def _maybe_confirm_test(self, api_key: str, user_tg_id: int) -> None:
         try:
-            sent = await self.client.send_message(BOT_USERNAME, "/token")
-            async with self.client.conversation(BOT_USERNAME, timeout=10) as conv:
-                response = await conv.get_response()
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{API_BASE}/test/pending",
+                    params={"api_key": api_key},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    if resp.status != 200:
+                        return
+                    data = await resp.json()
+                    if not data.get("pending"):
+                        return
 
-            token = response.text.strip()
-            if not token.startswith("pyut_"):
-                logger.warning("PyUpdater: unexpected /token response: %r", token)
-                return
-
-            self._lib_set("user_token", token)
-            logger.info("PyUpdater: user token saved automatically")
-
-            await asyncio.sleep(3)
-            await sent.delete()
-            await response.delete()
-
-        except asyncio.TimeoutError:
-            logger.warning("PyUpdater: bot did not respond to /token in time")
+                await session.post(
+                    f"{API_BASE}/test/confirm",
+                    json={"api_key": api_key, "user_tg_id": user_tg_id},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                )
         except Exception:
-            logger.exception("PyUpdater: failed to auto-fetch token")
+            pass
 
-    async def _ping(
-        self,
-        api_key: str,
-        secret_key: str,
-        user_tg_id: int,
-        module_name: str,
-        module: loader.Module,
-    ) -> None:
-        user_token: str = self._lib_get("user_token", "")
+    async def _ping(self, api_key: str, secret_key: str, user_tg_id: int, module_name: str) -> None:
+        user_token: str = self._lib_get(TOKEN_DB_KEY, "")
         payload = {
             "api_key":     api_key,
             "signature":   _sign(secret_key, api_key),
@@ -181,6 +214,7 @@ class PyUpdaterLib(loader.Library):
             payload["user_token"] = user_token
 
         try:
+            import aiohttp
             async with aiohttp.ClientSession() as session:
                 await session.post(
                     f"{API_BASE}/ping",
