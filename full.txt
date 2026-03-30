@@ -26,3 +26,4 @@ aigenuser
 github
 stream
 placeholders+
+PyInstall
