@@ -230,10 +230,8 @@ class CreatePacks(loader.Module):
         random_str = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
         short_name = f"pack_{random_str}_by_fcreate"
         
-        # Get group title and sanitize it
         chat = await message.get_chat()
         chat_title = getattr(chat, 'title', 'Chat')
-        # Clean title for Telegram limits or special chars if needed, but Title can be mostly anything
         
         title_prefix = "Ava" if not is_emoji_pack else "Emoji"
         full_title = f"{chat_title} {title_prefix} #{pack_number}"
@@ -383,8 +381,3 @@ class CreatePacks(loader.Module):
             await message.edit(self.strings("no_valid"))
 
         shutil.rmtree(tmp_dir, ignore_errors=True)
-
-
-# References:
-# [1] Telegram Stickers. core.telegram.org. Retrieved May 1, 2026, from https://core.telegram.org/stickers
-# [2] Telegram Limits — Telegram Info. limits.tginfo.me. Retrieved May 1, 2026, from https://limits.tginfo.me/en
