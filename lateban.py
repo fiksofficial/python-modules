@@ -1,3 +1,17 @@
+#         ______     ___  ___          _       _      
+#    ____ | ___ \    |  \/  |         | |     | |     
+#   / __ \| |_/ /   _| .  . | ___   __| |_   _| | ___ 
+#  / / _` |  __/ | | | |\/| |/ _ \ / _` | | | | |/ _ \
+# | | (_| | |  | |_| | |  | | (_) | (_| | |_| | |  __/
+#  \ \__,_\_|   \__, \_|  |_/\___/ \__,_|\__,_|_|\___|
+#   \____/       __/ |                                
+#               |___/                                  
+
+# На модуль распространяется лицензия "GNU General Public License v3.0"
+# https://github.com/all-licenses/GNU-General-Public-License-v3.0
+
+# meta developer: @pymodule
+
 import asyncio
 import logging
 from datetime import datetime, timezone
