@@ -485,10 +485,26 @@ class PlaceholdersMod(loader.Module):
             return cached
 
         try:
-            async with self.session.get(f"http://wttr.in/{city}?format=j1&lang=ru") as resp:
+            url = f"http://wttr.in/{city}?format=j1&lang=ru"
+            logging.debug(f"🔍 Запрос погоды: {url}")
+
+            async with self.session.get(url) as resp:
+                logging.debug(f"Статус: {resp.status} | Content-Type: {resp.headers.get('content-type')}")
+                
+                text = await resp.text()
+                logging.debug(" Начало ответа от wttr.in:")
+                print(text[:800])
                 if resp.status == 200:
-                    data = await resp.json()
-                    
+                    try:
+                        data = await resp.json()
+                        logging.debug(" Успешно распарсено как JSON")
+                    except Exception as json_err:
+                        logging.ERROR(f"Не удалось распарсить JSON: {json_err}")
+                        import json
+                        try:
+                            data = json.loads(text)
+                        except:
+                            logging.error("Ответ не является JSON")
                     c = data.get("current_condition", [{}])[0]
 
                     lang_ru_list = c.get("lang_ru", [])
@@ -511,8 +527,9 @@ class PlaceholdersMod(loader.Module):
                     return weather_data
 
         except Exception as e:
-            logging.error(f"Ошибка получения погоды для {city}: {e}")
+            logging.error(f"❌ Ошибка получения погоды для {city}: {e}")
 
+        # Значения по умолчанию
         default = {
             "condition": "Неизвестно",
             "temp": "??°C",
