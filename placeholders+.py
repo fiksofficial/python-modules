@@ -477,41 +477,53 @@ class PlaceholdersMod(loader.Module):
         return data.get("wind", "?? м/с")
     
     async def _get_weather_data(self):
-        city = self.config["weather_city"]
-        
-        cache_key = f"weather_{city}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-        
-        try:
-            async with self.session.get(f"http://wttr.in/{city}?format=j1&lang=ru") as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    c = data["current_condition"][0]
-                    weather_data = {
-                        "condition": c["lang_ru"][0]["value"],
-                        "temp": f"{c['temp_C']}°C",
-                        "weather_temp": f"{c['lang_ru'][0]['value']} {c['temp_C']}°C",
-                        "humidity": f"{c['humidity']}%",
-                        "pressure": f"{c['pressure']} мм",
-                        "wind": f"{c['windspeedKmph']} км/ч",
-                    }
-                    self.cache.set(cache_key, weather_data)
-                    return weather_data
-        except:
-            pass
-        
-        default = {
-            "condition": "Неизвестно",
-            "temp": "??°C",
-            "weather_temp": "??",
-            "humidity": "??%",
-            "pressure": "?? мм",
-            "wind": "?? км/ч",
-        }
-        self.cache.set(cache_key, default)
-        return default
+    city = self.config["weather_city"]
+    cache_key = f"weather_{city}"
+    
+    cached = self.cache.get(cache_key)
+    if cached:
+        return cached
+
+    try:
+        async with self.session.get(f"http://wttr.in/{city}?format=j1&lang=ru") as resp:
+            if resp.status == 200:
+                data = await resp.json()
+                
+                c = data.get("current_condition", [{}])[0]
+
+                lang_ru_list = c.get("lang_ru", [])
+                condition = lang_ru_list[0].get("value") if lang_ru_list else None
+
+                if not condition:
+                    weather_desc = c.get("weatherDesc", [])
+                    condition = weather_desc[0].get("value") if weather_desc else "Неизвестно"
+
+                weather_data = {
+                    "condition": condition,
+                    "temp": f"{c.get('temp_C', 'N/A')}°C",
+                    "weather_temp": f"{condition} {c.get('temp_C', 'N/A')}°C",
+                    "humidity": f"{c.get('humidity', 'N/A')}%",
+                    "pressure": f"{c.get('pressure', 'N/A')} мм",
+                    "wind": f"{c.get('windspeedKmph', 'N/A')} км/ч",
+                }
+                
+                self.cache.set(cache_key, weather_data)
+                return weather_data
+
+    except Exception as e:
+        pass
+
+    # Default значения
+    default = {
+        "condition": "Неизвестно",
+        "temp": "??°C",
+        "weather_temp": "Погода недоступна",
+        "humidity": "??%",
+        "pressure": "?? мм",
+        "wind": "?? км/ч",
+    }
+    self.cache.set(cache_key, default)
+    return default
 
     async def get_crypto_address(self): 
         return self.config["crypto_address"]
