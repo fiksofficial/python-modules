@@ -486,25 +486,24 @@ class PlaceholdersMod(loader.Module):
 
         try:
             url = f"http://wttr.in/{city}?format=j1&lang=ru"
-            logging.debug(f"🔍 Запрос погоды: {url}")
+            logging.debug(f"Запрос погоды: {url}")
 
             async with self.session.get(url) as resp:
                 logging.debug(f"Статус: {resp.status} | Content-Type: {resp.headers.get('content-type')}")
+
+                response_text = await resp.text()
                 
-                text = await resp.text()
-                logging.debug(" Начало ответа от wttr.in:")
-                print(text[:800])
+                logging.debug("Начало ответа от wttr.in:")
+                logging.debug(repr(response_text[:700]))
+
                 if resp.status == 200:
                     try:
-                        data = await resp.json()
-                        logging.debug(" Успешно распарсено как JSON")
+                        data = json.loads(response_text)
+                        logging.debug("Успешно распарсено как JSON")
                     except Exception as json_err:
-                        logging.ERROR(f"Не удалось распарсить JSON: {json_err}")
-                        import json
-                        try:
-                            data = json.loads(text)
-                        except:
-                            logging.error("Ответ не является JSON")
+                        logging.debug(f"Не JSON: {json_err}")
+                        raise
+
                     c = data.get("current_condition", [{}])[0]
 
                     lang_ru_list = c.get("lang_ru", [])
@@ -521,15 +520,15 @@ class PlaceholdersMod(loader.Module):
                         "humidity": f"{c.get('humidity', 'N/A')}%",
                         "pressure": f"{c.get('pressure', 'N/A')} мм",
                         "wind": f"{c.get('windspeedKmph', 'N/A')} км/ч",
+                        "feels_like": f"{c.get('FeelsLikeC', 'N/A')}°C",
                     }
                     
                     self.cache.set(cache_key, weather_data)
                     return weather_data
 
         except Exception as e:
-            logging.error(f"❌ Ошибка получения погоды для {city}: {e}")
+            logging.debug(f"Ошибка получения погоды для {city}: {e}")
 
-        # Значения по умолчанию
         default = {
             "condition": "Неизвестно",
             "temp": "??°C",
@@ -537,6 +536,7 @@ class PlaceholdersMod(loader.Module):
             "humidity": "??%",
             "pressure": "?? мм",
             "wind": "?? км/ч",
+            "feels_like": "??°C",
         }
         self.cache.set(cache_key, default)
         return default
