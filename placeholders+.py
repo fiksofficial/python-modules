@@ -477,53 +477,52 @@ class PlaceholdersMod(loader.Module):
         return data.get("wind", "?? м/с")
     
     async def _get_weather_data(self):
-    city = self.config["weather_city"]
-    cache_key = f"weather_{city}"
-    
-    cached = self.cache.get(cache_key)
-    if cached:
-        return cached
+        city = self.config["weather_city"]
+        cache_key = f"weather_{city}"
+        
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
 
-    try:
-        async with self.session.get(f"http://wttr.in/{city}?format=j1&lang=ru") as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                
-                c = data.get("current_condition", [{}])[0]
+        try:
+            async with self.session.get(f"http://wttr.in/{city}?format=j1&lang=ru") as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    
+                    c = data.get("current_condition", [{}])[0]
 
-                lang_ru_list = c.get("lang_ru", [])
-                condition = lang_ru_list[0].get("value") if lang_ru_list else None
+                    lang_ru_list = c.get("lang_ru", [])
+                    condition = lang_ru_list[0].get("value") if lang_ru_list else None
 
-                if not condition:
-                    weather_desc = c.get("weatherDesc", [])
-                    condition = weather_desc[0].get("value") if weather_desc else "Неизвестно"
+                    if not condition:
+                        weather_desc = c.get("weatherDesc", [])
+                        condition = weather_desc[0].get("value") if weather_desc else "Неизвестно"
 
-                weather_data = {
-                    "condition": condition,
-                    "temp": f"{c.get('temp_C', 'N/A')}°C",
-                    "weather_temp": f"{condition} {c.get('temp_C', 'N/A')}°C",
-                    "humidity": f"{c.get('humidity', 'N/A')}%",
-                    "pressure": f"{c.get('pressure', 'N/A')} мм",
-                    "wind": f"{c.get('windspeedKmph', 'N/A')} км/ч",
-                }
-                
-                self.cache.set(cache_key, weather_data)
-                return weather_data
+                    weather_data = {
+                        "condition": condition,
+                        "temp": f"{c.get('temp_C', 'N/A')}°C",
+                        "weather_temp": f"{condition} {c.get('temp_C', 'N/A')}°C",
+                        "humidity": f"{c.get('humidity', 'N/A')}%",
+                        "pressure": f"{c.get('pressure', 'N/A')} мм",
+                        "wind": f"{c.get('windspeedKmph', 'N/A')} км/ч",
+                    }
+                    
+                    self.cache.set(cache_key, weather_data)
+                    return weather_data
 
-    except Exception as e:
-        pass
+        except Exception as e:
+            logging.error(f"Ошибка получения погоды для {city}: {e}")
 
-    # Default значения
-    default = {
-        "condition": "Неизвестно",
-        "temp": "??°C",
-        "weather_temp": "Погода недоступна",
-        "humidity": "??%",
-        "pressure": "?? мм",
-        "wind": "?? км/ч",
-    }
-    self.cache.set(cache_key, default)
-    return default
+        default = {
+            "condition": "Неизвестно",
+            "temp": "??°C",
+            "weather_temp": "Погода недоступна",
+            "humidity": "??%",
+            "pressure": "?? мм",
+            "wind": "?? км/ч",
+        }
+        self.cache.set(cache_key, default)
+        return default
 
     async def get_crypto_address(self): 
         return self.config["crypto_address"]
