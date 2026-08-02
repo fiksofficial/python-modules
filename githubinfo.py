@@ -15,7 +15,6 @@
 # requires: aiohttp
 
 from .. import loader, utils
-from ..inline.types import InlineCall
 import logging
 import asyncio
 import aiohttp
@@ -260,7 +259,7 @@ class GitHubInfoMod(loader.Module):
             ttl=10 * 60,
         )
 
-    async def _profile(self, call: InlineCall, username: str):
+    async def _profile(self, call, username: str):
         # Этот метод теперь используется только для возврата к профилю
         data = await self.github_fetch(f"https://api.github.com/users/{username}")
         if "message" in data:
@@ -301,7 +300,7 @@ class GitHubInfoMod(loader.Module):
             ]
         )
 
-    async def _activity(self, call: InlineCall, username: str):
+    async def _activity(self, call, username: str):
         events = await self.github_fetch(f"https://api.github.com/users/{username}/events?per_page=40")
         if "message" in events:
             await call.edit(self.strings("api_error").format(msg=events["message"]), reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]])
@@ -391,7 +390,7 @@ class GitHubInfoMod(loader.Module):
             reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]]
         )
 
-    async def _repos(self, call: InlineCall, username: str):
+    async def _repos(self, call, username: str):
         repos = await self.github_fetch(f"https://api.github.com/users/{username}/repos?sort=stars&per_page=10")
         if "message" in repos:
             await call.edit(self.strings("api_error").format(msg=repos["message"]), reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]])
@@ -416,7 +415,7 @@ class GitHubInfoMod(loader.Module):
             reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]]
         )
 
-    async def _orgs(self, call: InlineCall, username: str):
+    async def _orgs(self, call, username: str):
         orgs = await self.github_fetch(f"https://api.github.com/users/{username}/orgs")
         if "message" in orgs:
             await call.edit(self.strings("api_error").format(msg=orgs["message"]), reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]])
@@ -438,7 +437,7 @@ class GitHubInfoMod(loader.Module):
             reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]]
         )
 
-    async def _contrib(self, call: InlineCall, username: str):
+    async def _contrib(self, call, username: str):
         data = await self.github_fetch(f"https://github-contributions-api.deno.dev/{username}.json", github_api=False)
         if not data or not data.get("contributions"):
             await call.edit(self.strings("no_contrib"), reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]])
