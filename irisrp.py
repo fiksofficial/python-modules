@@ -6,7 +6,7 @@
 # requires: toml
 import os
 from .. import loader, utils
-from telethon.tl.types import Channel
+from telethon.tl.types import Channel, Message
 import toml
 import logging
 
@@ -456,6 +456,9 @@ class IrisRP(loader.Module):
 
     async def watcher(self, message):
         try:
+            if not isinstance(message, Message) or not getattr(message, "sender_id", None):
+                return
+
             status = self.db.get("RPMod", "status", 0)
             commands = self.db.get("RPMod", "nrpcommands", {})
             users_accept = self.db.get("RPMod", "useraccept", {"users": [], "chats": []})
