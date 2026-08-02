@@ -182,6 +182,15 @@ class GitHubInfoMod(loader.Module):
 
     def __init__(self):
         self._session: aiohttp.ClientSession | None = None
+        self.config = loader.ModuleConfig(
+            loader.ConfigValue(
+                "github_token",
+                "",
+                "GitHub Personal Access Token (github.com/settings/tokens).\n"
+                "Без токена: 60 запросов/час. С токеном: 5000 запросов/час.",
+                validator=loader.validators.String(),
+            ),
+        )
 
     async def client_ready(self):
         self._session = aiohttp.ClientSession(
@@ -198,6 +207,9 @@ class GitHubInfoMod(loader.Module):
             "Accept": "application/vnd.github+json" if github_api else "application/json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+        token = self.config["github_token"]
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         logger.info(f"[GitHub] GET {url}")
         try:
             async with self._session.get(url, headers=headers) as resp:
