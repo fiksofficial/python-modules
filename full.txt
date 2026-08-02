@@ -16,7 +16,7 @@ githubinfo
 qrgen
 wiki
 checkhost
-createavatarspack
+createpacks
 multiunloadmodule
 tagall2.0
 point
