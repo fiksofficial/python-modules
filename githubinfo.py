@@ -15,7 +15,7 @@
 # requires: aiohttp
 
 from .. import loader, utils
-from ..inline import InlineCall
+from ..inline.types import InlineCall
 import logging
 import asyncio
 import aiohttp
