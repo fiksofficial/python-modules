@@ -210,6 +210,9 @@ class GitHubInfoMod(loader.Module):
         token = self.config["github_token"]
         if token:
             headers["Authorization"] = f"Bearer {token}"
+            logger.info(f"[GitHub] token applied: ...{token[-6:]}")
+        else:
+            logger.info("[GitHub] token NOT configured (60 req/h limit)")
         logger.info(f"[GitHub] GET {url}")
         try:
             async with self._session.get(url, headers=headers) as resp:
