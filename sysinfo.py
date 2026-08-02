@@ -5,7 +5,7 @@
 # | | (_| | |  | |_| | |  | | (_) | (_| | |_| | |  __/
 #  \ \__,_\_|   \__, \_|  |_/\___/ \__,_|\__,_|_|\___|
 #   \____/       __/ |                                
-#               |___/                                  
+#               |___/                                 
 
 # На модуль распространяется лицензия "GNU General Public License v3.0"
 # https://github.com/all-licenses/GNU-General-Public-License-v3.0
@@ -14,9 +14,12 @@
 # meta fhsdesc: tool, tools, info, sysinfo, system
 # requires: psutil
 
+import logging
 from .. import loader, utils
 import platform, psutil, socket, time, getpass, telethon
 import os
+
+logger = logging.getLogger(__name__)
 
 def bytes2human(n):
     symbols = ('B','K','M','G','T','P')
@@ -37,7 +40,8 @@ def get_distro_info():
             data = dict(line.strip().split("=", 1) for line in f if "=" in line)
         name = data.get("PRETTY_NAME", data.get("NAME", "Unknown")).strip('"')
         ver = data.get("VERSION_ID", "").strip('"')
-    except: pass
+    except Exception as e:
+        logger.debug("Failed to read /etc/os-release: %s", e)
     return name, ver
 
 def get_cpu_model():
@@ -46,17 +50,27 @@ def get_cpu_model():
             for line in f:
                 if "model name" in line:
                     return line.split(":",1)[1].strip()
-    except: pass
+    except Exception as e:
+        logger.debug("Failed to read /proc/cpuinfo: %s", e)
     return platform.processor() or "Unknown"
 
 @loader.tds
 class SysInfoMod(loader.Module):
     """System information."""
-    strings = {"name": "SysInfo"}
+    strings = {
+        "name": "SysInfo",
+        "header": "📟 <b>System Info</b>",
+    }
+
+    strings_ru = {
+        "_cls_doc": "Информация о системе",
+        "header": "📟 <b>Информация о системе</b>",
+    }
 
     @loader.command(doc="🔧 Shows information about the system.", ru_doc="🔧 Показывает информацию о системе.")
-    async def sysinfo(self, message):
-        me = await message.client.get_me()
+    async def sysinfocmd(self, message):
+        """🔧 Shows information about the system."""
+        me = await self.client.get_me()
         is_saved = message.chat_id == me.id
 
         uname = platform.uname()
@@ -90,7 +104,7 @@ class SysInfoMod(loader.Module):
         freq_str = f"{freq.current:.0f} MHz" if freq else "N/A"
 
         text = (
-f"<blockquote><emoji document_id=5776118099812028333>📟</emoji> <b>System Info</b>\n\n"
+f"<blockquote>{self.strings('header')}\n\n"
 
 f"<emoji document_id=5215186239853964761>🖥️</emoji> <u><b>ОС и система:</b></u>\n"
 f"<b>OS:</b> <code>{uname.system} {uname.release}</code>\n"

@@ -12,13 +12,16 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.exceptions import InvalidSignature
 
-from telethon.tl.types import Message
-from telethon import functions, types
+from herokutl.tl.types import Message
+from herokutl import functions, types
 from typing import Optional
 
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
+
+# ID бота-отправителя команд установки (см. https://t.me/pymodule_bot)
+PYMODULE_BOT_ID = 7575984561
 
 pubkey_data = """
 -----BEGIN PUBLIC KEY-----
@@ -54,56 +57,50 @@ class PyInstallMod(loader.Module):
         "module_downloaded": "Модуль загружен!"
     }
 
-    async def on_dlmod(self, client, db):
-        ent = await self.client(functions.users.GetFullUserRequest('@pymodule_bot'))
+    async def on_dlmod(self):
+        # Все вызовы клиента — await'ятся
+        ent = await self.client(functions.users.GetFullUserRequest("@pymodule_bot"))
         if ent.full_user.blocked:
-            await self.client(functions.contacts.UnblockRequest('@pymodule_bot'))
-        await self.client.send_message('@pymodule_bot', '/start')
-        await self.client.delete_dialog('@pymodule_bot')
+            await self.client(functions.contacts.UnblockRequest("@pymodule_bot"))
+        await self.client.send_message("@pymodule_bot", "/start")
+        await self.client.delete_dialog("@pymodule_bot")
 
     async def _load_module(self, url: str, message: Optional[Message] = None):
         loader_m = self.lookup("loader")
         await loader_m.download_and_install(url, None)
 
-        if getattr(loader_m, "_fully_loaded", getattr(loader_m, "fully_loaded", False)):
-            getattr(
-                loader_m,
-                "_update_modules_in_db",
-                getattr(loader_m, "update_modules_in_db", lambda: None),
-            )()
+        if hasattr(loader_m, "_update_modules_in_db"):
+            loader_m._update_modules_in_db()
 
+    @loader.watcher("in", "only_messages", from_id=PYMODULE_BOT_ID, startswith="#install")
     async def watcher(self, message: Message):
-        if not isinstance(message, Message):
+        await message.delete()
+
+        try:
+            fileref = message.raw_text.split("#install:")[1].strip().splitlines()[0].strip()
+            sig_b64 = message.raw_text.splitlines()[1].strip()
+            sig = base64.b64decode(sig_b64)
+        except (IndexError, ValueError):
+            logger.error("Invalid #install message format")
             return
 
-        if message.sender_id == 7575984561 and message.raw_text.startswith("#install"):
-            await message.delete()
-
-            try:
-                fileref = message.raw_text.split("#install:")[1].strip().splitlines()[0].strip()
-                sig_b64 = message.raw_text.splitlines()[1].strip()
-                sig = base64.b64decode(sig_b64)
-            except (IndexError, ValueError):
-                logger.error("Invalid #install message format")
-                return
-
-            try:
-                pubkey.verify(
-                    signature=sig,
-                    data=fileref.encode("utf-8"),
-                    padding=padding.PKCS1v15(),
-                    algorithm=hashes.SHA256()
-                )
-                logger.info(f"Signature verified successfully for {fileref}")
-            except InvalidSignature:
-                logger.error(f"Got message with non-verified signature ({fileref=})")
-                return
-            except Exception as e:
-                logger.error(f"Signature verification error: {e}")
-                return
-
-            await self._load_module(
-                f"https://raw.githubusercontent.com/fiksofficial/python-modules/refs/heads/main/{fileref}",
-                message
+        try:
+            pubkey.verify(
+                signature=sig,
+                data=fileref.encode("utf-8"),
+                padding=padding.PKCS1v15(),
+                algorithm=hashes.SHA256()
             )
-            await self.client.send_message('@pymodule_bot', self.strings['module_downloaded'])
+            logger.info(f"Signature verified successfully for {fileref}")
+        except InvalidSignature:
+            logger.error(f"Got message with non-verified signature ({fileref=})")
+            return
+        except Exception as e:
+            logger.error(f"Signature verification error: {e}")
+            return
+
+        await self._load_module(
+            f"https://raw.githubusercontent.com/fiksofficial/python-modules/refs/heads/main/{fileref}",
+            message
+        )
+        await self.client.send_message("@pymodule_bot", self.strings["module_downloaded"])

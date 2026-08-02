@@ -12,12 +12,13 @@
 
 # meta developer: @pymodule
 # meta fhsdesc: tool, tools, github, info, inline
+# requires: aiohttp
 
 from .. import loader, utils
 from ..inline import InlineCall
 import logging
 import asyncio
-import urllib.request
+import aiohttp
 import json
 from datetime import datetime, timedelta
 
@@ -180,6 +181,16 @@ class GitHubInfoMod(loader.Module):
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self._session: aiohttp.ClientSession | None = None
+
+    async def client_ready(self):
+        self._session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=15)
+        )
+
+    async def on_unload(self):
+        if self._session:
+            await self._session.close()
 
     async def github_fetch(self, url, github_api=True):
         headers = {
@@ -187,11 +198,15 @@ class GitHubInfoMod(loader.Module):
             "Accept": "application/vnd.github+json" if github_api else "application/json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        req = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                raw = resp.read().decode("utf-8")
-                return json.loads(raw) if raw else {}
+            async with self._session.get(url, headers=headers) as resp:
+                raw = await resp.text()
+                if not raw:
+                    return {}
+                data = await resp.json(content_type=None)
+                if not resp.ok:
+                    return {"message": data.get("message", resp.status)}
+                return data
         except Exception as e:
             self.logger.error(f"[GitHub] {e}")
             return {"message": str(e)}

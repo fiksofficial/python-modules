@@ -16,11 +16,11 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from herokutl.tl.functions.channels import (
+from telethon.tl.functions.channels import (
     EditBannedRequest,
     GetParticipantsRequest,
 )
-from herokutl.tl.types import (
+from telethon.tl.types import (
     ChatBannedRights,
     ChannelParticipantsSearch,
     MessageService,
@@ -102,8 +102,8 @@ class LateBanMod(loader.Module):
         "nobody":    "✅ Участников, вступивших после <b>{dt}</b>, не найдено.",
     }
 
-    async def client_ready(self):
-        pass
+    async def client_ready(self, client, db):
+        self._client = client
 
     @loader.command(ru_doc="<DD.MM.YYYY [HH:MM] | HH:MM> - Забанить всех, кто присоединился после определённой даты/времени.")
     async def latebancmd(self, message):
@@ -196,7 +196,7 @@ class LateBanMod(loader.Module):
         return targets
 
     async def _do_ban(self, call, chat, targets: list, dt_str: str, cutoff: datetime):
-        await call.edit(self.strings["banning"].format(count=len(targets)))
+        await self._edit_call(call, self.strings["banning"].format(count=len(targets)))
 
         banned     = 0
         skipped    = 0
@@ -212,20 +212,24 @@ class LateBanMod(loader.Module):
                 skipped += 1
 
             if i % 10 == 0:
-                try:
-                    await call.edit(
-                        self.strings["progress"].format(done=i, total=len(targets))
-                    )
-                except Exception:
-                    pass
+                await self._edit_call(
+                    call,
+                    self.strings["progress"].format(done=i, total=len(targets)),
+                )
 
             await asyncio.sleep(0.4)
 
         deleted = await self._delete_join_messages(chat, banned_ids, cutoff)
 
-        await call.edit(self.strings["done"].format(
+        await self._edit_call(call, self.strings["done"].format(
             banned=banned, skipped=skipped, deleted=deleted
         ))
+
+    async def _edit_call(self, call, text: str):
+        try:
+            await call.edit(text)
+        except Exception as e:
+            logger.warning("LateBan: failed to edit inline form — %s", e)
 
     async def _delete_join_messages(
         self, chat, banned_ids: set, cutoff: datetime

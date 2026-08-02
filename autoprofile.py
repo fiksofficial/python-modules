@@ -4,7 +4,6 @@
 # meta developer: @pymodule
 # meta fhsdesc: tool, tools, user, profile
 
-from hikkatl.types import Message
 from telethon.tl.functions.account import UpdateProfileRequest
 from .. import loader, utils
 import asyncio
@@ -34,6 +33,7 @@ class AutoProfileMod(loader.Module):
     }
 
     strings_ru = {
+        "_cls_doc": "Автоматически обновляет описание вашего профиля",
         "no_desc": "<b>[AutoProfile] Нет сохранённых описаний!</b>",
         "error": "<b>[AutoProfile] Ошибка автообновления описания:</b> {}",
         "enabled": "<b>[AutoProfile] Автоописание включено!</b>",
@@ -52,19 +52,45 @@ class AutoProfileMod(loader.Module):
 
     def __init__(self):
         self._task = None
+        self.config = loader.ModuleConfig(
+            loader.ConfigValue(
+                "enabled",
+                False,
+                lambda: "Auto bio enabled",
+                validator=loader.validators.Boolean(),
+            ),
+            loader.ConfigValue(
+                "interval",
+                3600,
+                lambda: "Interval in seconds",
+                validator=loader.validators.Integer(minimum=10),
+            ),
+            loader.ConfigValue(
+                "descriptions",
+                [],
+                lambda: "List of descriptions",
+                validator=loader.validators.Series(),
+            ),
+        )
 
     async def client_ready(self, client, db):
         self.client = client
         self.db = db
-
-        self.config = loader.ModuleConfig(
-            "enabled", False, "Auto bio enabled",
-            "interval", 3600, "Interval in seconds",
-            "descriptions", [], "List of descriptions"
-        )
-
         if self.config["enabled"]:
-            self._task = asyncio.create_task(self._update_bio())
+            self._start_task()
+
+    def _start_task(self):
+        if self._task and not self._task.done():
+            return
+        self._task = asyncio.create_task(self._update_bio())
+
+    def _stop_task(self):
+        if self._task and not self._task.done():
+            self._task.cancel()
+        self._task = None
+
+    async def on_unload(self):
+        self._stop_task()
 
     async def _update_bio(self):
         while self.config["enabled"]:
@@ -85,7 +111,7 @@ class AutoProfileMod(loader.Module):
         ru_doc="Включить или отключить автоописание",
         en_doc="Enable or disable auto bio updates"
     )
-    async def autodesccmd(self, message: Message):
+    async def autodesccmd(self, message):
         """Toggle auto bio"""
         arg = utils.get_args_raw(message)
         if arg not in ["on", "off"]:
@@ -96,16 +122,17 @@ class AutoProfileMod(loader.Module):
         self.config["enabled"] = enabled
 
         if enabled:
-            self._task = asyncio.create_task(self._update_bio())
+            self._start_task()
             await utils.answer(message, self.strings("enabled"))
         else:
+            self._stop_task()
             await utils.answer(message, self.strings("disabled"))
 
     @loader.command(
         ru_doc="Добавить описание: .adddesc <текст>",
         en_doc="Add a description: .adddesc <text>"
     )
-    async def adddesccmd(self, message: Message):
+    async def adddesccmd(self, message):
         """Add description"""
         text = utils.get_args_raw(message)
         if not text:
@@ -119,7 +146,7 @@ class AutoProfileMod(loader.Module):
         ru_doc="Удалить описание по номеру: .deldesc <номер>",
         en_doc="Delete description by number: .deldesc <number>"
     )
-    async def deldesccmd(self, message: Message):
+    async def deldesccmd(self, message):
         """Delete description"""
         args = utils.get_args_raw(message)
         if not args.isdigit():
@@ -138,7 +165,7 @@ class AutoProfileMod(loader.Module):
         ru_doc="Показать список описаний",
         en_doc="Show list of descriptions"
     )
-    async def listdesccmd(self, message: Message):
+    async def listdesccmd(self, message):
         """List descriptions"""
         descs = self.config["descriptions"]
         if not descs:
@@ -152,7 +179,7 @@ class AutoProfileMod(loader.Module):
         ru_doc="Установить интервал обновления: .setinterval <сек>",
         en_doc="Set update interval: .setinterval <seconds>"
     )
-    async def setintervalcmd(self, message: Message):
+    async def setintervalcmd(self, message):
         """Set update interval"""
         args = utils.get_args_raw(message)
         if not args.isdigit():

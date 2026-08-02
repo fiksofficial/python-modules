@@ -13,7 +13,7 @@
 # meta developer: @pymodule
 # meta fhsdesc: tool, tools, auto, restart, heroku, hikka
 
-from hikkatl.types import Message
+from herokutl.tl.types import Message
 from .. import loader, utils
 import asyncio
 import re
@@ -79,7 +79,7 @@ class HistartMod(loader.Module):
         try:
             while True:
                 await asyncio.sleep(self.config["interval"])
-                await self.invoke("restart", "-f", peer="me")
+                await self.allmodules.commands["restart"]("-f", peer="me")
         except asyncio.CancelledError:
             pass  # task manually cancelled
 

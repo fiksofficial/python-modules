@@ -2,7 +2,9 @@
 import asyncio
 import mimetypes
 import os
+import signal
 import subprocess
+import tempfile
 import time
 
 from .. import loader, utils
@@ -185,7 +187,14 @@ class StreamMod(loader.Module):
     def _stop(self):
         if self._proc:
             try:
-                self._proc.terminate()
+                pgid = os.getpgid(self._proc.pid)
+                os.killpg(pgid, signal.SIGTERM)
+            except Exception:
+                try:
+                    self._proc.terminate()
+                except Exception:
+                    pass
+            try:
                 self._proc.wait(timeout=5)
             except Exception:
                 try:
@@ -201,11 +210,23 @@ class StreamMod(loader.Module):
         self._file = None
         self._started = None
 
+    async def on_unload(self):
+        if self._qtask:
+            self._qtask.cancel()
+            self._qtask = None
+        self._queue.clear()
+        self._stop()
+
     def _launch(self, path: str):
         cfg = {k: self.config[k] for k in ("preset", "tune", "vbitrate", "abitrate", "fps", "threads")}
         cfg["resolution"] = self.config["resolution"] or None
         rtmp = f"{self.config['rtmps'].rstrip('/')}/{self.config['key']}"
-        self._proc    = subprocess.Popen(build_cmd(path, rtmp, cfg), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self._proc    = subprocess.Popen(
+            build_cmd(path, rtmp, cfg),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
         self._file    = path
         self._started = time.time()
 
@@ -392,9 +413,12 @@ class StreamMod(loader.Module):
             return
 
         status = await utils.answer(message, self._s("downloading"))
-        path   = await reply.download_media(file=f"/tmp/stream_{int(time.time())}")
+        path   = await reply.download_media(file=os.path.join(tempfile.gettempdir(), f"stream_{int(time.time())}"))
         if not path:
-            await status.edit(self._s("dl_failed"))
+            try:
+                await status.edit(self._s("dl_failed"))
+            except Exception:
+                pass
             return
         await status.delete()
 

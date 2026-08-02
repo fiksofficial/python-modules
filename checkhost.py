@@ -1,8 +1,18 @@
 # meta fhsdesc: tool, tools, server, admin
+# requires: aiohttp
+
 from .. import loader, utils
 import aiohttp
 import asyncio
+import logging
 from ..inline.types import InlineQuery
+
+logger = logging.getLogger(__name__)
+
+HEADERS = {"Accept": "application/json"}
+
+MAX_POLL_ATTEMPTS = 15
+POLL_DELAY = 2
 
 
 @loader.tds
@@ -27,6 +37,7 @@ class CheckHostMod(loader.Module):
 
     strings_ru = {
         "name": "CheckHost",
+        "_cls_doc": "Проверка хоста через check-host.net",
         "no_target": "❗ Укажи хост (IP или домен).",
         "checking": "🔍 Проверка <code>{}</code> через <b>{}</b>...",
         "result": "📡 <b>Результаты {}</b> для <code>{}</code>:\n\n{}",
@@ -42,16 +53,23 @@ class CheckHostMod(loader.Module):
     }
 
     def __init__(self):
-        self._last_host = None
+        self._session: aiohttp.ClientSession | None = None
+
+    async def client_ready(self):
+        self._session = aiohttp.ClientSession(headers=HEADERS)
+
+    async def on_unload(self):
+        if self._session and not self._session.closed:
+            await self._session.close()
 
     @loader.command(doc="[host] — check host", ru_doc="[хост] — проверить хост")
-    async def checkhost(self, message):
+    async def checkhostcmd(self, message):
+        """[host] — check host / проверить хост"""
         args = utils.get_args_raw(message)
         if not args:
             return await utils.answer(message, self.strings("no_target"))
 
         host = args.strip()
-        self._last_host = host
 
         await self.inline.form(
             text=self.strings("inline_select").format(host),
@@ -77,24 +95,31 @@ class CheckHostMod(loader.Module):
                 result = await self._run_check(check_type, host)
                 await call.edit(self.strings("result").format(check_type.upper(), host, result))
             except Exception as e:
-                await call.edit(self.strings("error").format(str(e)))
+                logger.exception("Error in check-host callback")
+                await call.edit(self.strings("error").format(utils.escape_html(str(e))))
         return wrapped
 
     async def _run_check(self, check_type, target):
-        async with aiohttp.ClientSession(headers={"Accept": "application/json"}) as session:
-            params = {"host": target, "max_nodes": 3}
-            start_url = f"https://check-host.net/check-{check_type}"
-            async with session.get(start_url, params=params) as resp:
+        params = {"host": target, "max_nodes": 3}
+        start_url = f"https://check-host.net/check-{check_type}"
+        async with self._session.get(start_url, params=params) as resp:
+            data = await resp.json()
+
+        request_id = data.get("request_id")
+        if not request_id:
+            raise ValueError("API error: no request_id")
+
+        # Поллинг результата вместо фиксированного sleep — ждём пока
+        # все узлы ответят (или выйдем по лимиту попыток)
+        result_url = f"https://check-host.net/check-result/{request_id}"
+        data = None
+        for _ in range(MAX_POLL_ATTEMPTS):
+            await asyncio.sleep(POLL_DELAY)
+            async with self._session.get(result_url) as resp:
                 data = await resp.json()
 
-            request_id = data.get("request_id")
-            if not request_id:
-                raise ValueError("API error: no request_id")
-
-            await asyncio.sleep(3)
-            result_url = f"https://check-host.net/check-result/{request_id}"
-            async with session.get(result_url, params={"accept": "application/json"}) as resp:
-                data = await resp.json()
+            if data and all(value is not None for value in data.values()):
+                break
 
         return self._parse_results(data)
 

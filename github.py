@@ -19,8 +19,8 @@ import re
 from datetime import datetime, timezone
 
 import aiohttp
-from herokutl.tl.functions.channels import EditAdminRequest, InviteToChannelRequest
-from herokutl.tl.types import Channel, Chat, ChatAdminRights, Message
+from telethon.tl.functions.channels import EditAdminRequest, InviteToChannelRequest
+from telethon.tl.types import Channel, Chat, ChatAdminRights, Message
 
 from .. import loader, utils
 
@@ -443,6 +443,11 @@ class GitHubMod(loader.Module):
             with contextlib.suppress(Exception):
                 await s.close()
 
+    async def _edit_call(self, call, *args, **kwargs):
+        try:
+            await call.edit(*args, **kwargs)
+        except Exception as e:
+            logger.warning("GitHubMod: failed to edit inline form — %s", e)
 
     def _get_dests(self) -> dict:
         return self.db.get("GitHubMod", "dests", {})
@@ -932,7 +937,7 @@ class GitHubMod(loader.Module):
         if isinstance(call_or_msg, Message):
             await self.inline.form(message=call_or_msg, text=text, reply_markup=markup)
         else:
-            await call_or_msg.edit(text, reply_markup=markup)
+            await self._edit_call(call_or_msg, text, reply_markup=markup)
 
 
     async def _cb_main_menu(self, call):
@@ -940,7 +945,7 @@ class GitHubMod(loader.Module):
 
     async def _cb_open_panel(self, call, cid_str: str):
         dest = self._get_dests().get(cid_str, {})
-        await call.edit(self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
+        await self._edit_call(call, self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
 
     async def _cb_toggle_event(self, call, cid_str: str, event: str):
         dests = self._get_dests()
@@ -952,14 +957,14 @@ class GitHubMod(loader.Module):
         dests[cid_str]["events"] = events
         self._save_dests(dests)
         dest = dests[cid_str]
-        await call.edit(self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
+        await self._edit_call(call, self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
 
     async def _cb_remove_repo(self, call, cid_str: str, repo: str):
         dests = self._get_dests()
         dests[cid_str].get("repos", {}).pop(repo, None)
         self._save_dests(dests)
         dest = dests[cid_str]
-        await call.edit(self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
+        await self._edit_call(call, self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
 
     async def _cb_clear_token(self, call, cid_str: str):
         dests = self._get_dests()
@@ -967,7 +972,7 @@ class GitHubMod(loader.Module):
         self._save_dests(dests)
         self._reset_session(cid_str)
         dest = dests[cid_str]
-        await call.edit(self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
+        await self._edit_call(call, self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
 
     async def _cb_remove_dest(self, call, cid_str: str):
         dests = self._get_dests()
@@ -975,12 +980,12 @@ class GitHubMod(loader.Module):
         dests.pop(cid_str, None)
         self._save_dests(dests)
         self._reset_session(cid_str)
-        await call.edit(self.strings("dest_removed").format(title=title))
+        await self._edit_call(call, self.strings("dest_removed").format(title=title))
 
     async def _cb_add_dest(self, call, dest_type: str):
         icon = "📢" if dest_type == "channel" else "👥"
         label = self.strings("dest_label_channel") if dest_type == "channel" else self.strings("dest_label_group")
-        await call.edit(
+        await self._edit_call(call,
             self.strings("enter_dest").format(icon=icon, label=label, label_lc=label.lower()),
             reply_markup=[
                 [{
@@ -996,7 +1001,7 @@ class GitHubMod(loader.Module):
     async def _cb_got_dest(self, call, peer_str: str, dest_type: str):
         entity = await self._resolve_peer(peer_str)
         if not entity:
-            await call.edit(
+            await self._edit_call(call,
                 self.strings("dest_not_found"),
                 reply_markup=[[{"text": self.strings("btn_back"), "callback": self._cb_main_menu}]],
             )
@@ -1004,7 +1009,7 @@ class GitHubMod(loader.Module):
 
         ok, err = await self._invite_bot(entity)
         if not ok:
-            await call.edit(
+            await self._edit_call(call,
                 self.strings("bot_invite_fail").format(bot=self.inline.bot_username),
                 reply_markup=[[{"text": self.strings("btn_back"), "callback": self._cb_main_menu}]],
             )
@@ -1026,7 +1031,7 @@ class GitHubMod(loader.Module):
             }
             self._save_dests(dests)
 
-        await call.edit(
+        await self._edit_call(call,
             self.strings("dest_configured").format(label=label, title=title),
             reply_markup=[
                 [{
@@ -1046,25 +1051,25 @@ class GitHubMod(loader.Module):
         title = dest.get("title", cid_str)
 
         if "/" not in repo or len(repo.split("/")) != 2:
-            await call.edit(
+            await self._edit_call(call,
                 self.strings("repo_invalid_format"),
                 reply_markup=[[{"text": self.strings("btn_back"), "callback": self._cb_open_panel, "args": (cid_str,)}]],
             )
             return
         if repo in dest.get("repos", {}):
-            await call.edit(
+            await self._edit_call(call,
                 self.strings("repo_already").format(repo=repo, title=title),
                 reply_markup=[[{"text": self.strings("btn_back"), "callback": self._cb_open_panel, "args": (cid_str,)}]],
             )
             return
 
-        await call.edit(self.strings("checking_repo"))
+        await self._edit_call(call, self.strings("checking_repo"))
         exists, rl = await self._check_repo(repo, cid_str)
         if rl:
-            await call.edit(self.strings("rate_limit").format(reset="—"))
+            await self._edit_call(call, self.strings("rate_limit").format(reset="—"))
             return
         if not exists:
-            await call.edit(
+            await self._edit_call(call,
                 self.strings("repo_not_found").format(repo=repo),
                 reply_markup=[[{"text": self.strings("btn_back"), "callback": self._cb_open_panel, "args": (cid_str,)}]],
             )
@@ -1074,7 +1079,7 @@ class GitHubMod(loader.Module):
         dests[cid_str].setdefault("repos", {})[repo] = {"last_checked": now_iso}
         self._save_dests(dests)
         dest = dests[cid_str]
-        await call.edit(self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
+        await self._edit_call(call, self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
 
     async def _cb_set_interval(self, call, val: str, cid_str: str):
         try:
@@ -1087,7 +1092,7 @@ class GitHubMod(loader.Module):
         dests[cid_str]["interval"] = secs
         self._save_dests(dests)
         dest = dests[cid_str]
-        await call.edit(self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
+        await self._edit_call(call, self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
 
     async def _cb_set_token(self, call, token: str, cid_str: str):
         token = token.strip()
@@ -1096,7 +1101,7 @@ class GitHubMod(loader.Module):
         self._save_dests(dests)
         self._reset_session(cid_str)
         dest = dests[cid_str]
-        await call.edit(self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
+        await self._edit_call(call, self._panel_text(dest), reply_markup=self._panel_markup(cid_str, dest))
 
 
     @loader.command(ru_doc="- Открыть панель управления GitHub Monitor")

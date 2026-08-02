@@ -27,7 +27,7 @@ from collections import OrderedDict
 
 from .. import loader, utils, validators
 from telethon.tl.functions.users import GetFullUserRequest
-from herokutl.tl.functions.payments import GetStarsStatusRequest
+from telethon.tl.functions.payments import GetStarsStatusRequest
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,12 @@ class PlaceholdersMod(loader.Module):
                 validator=validators.String(),
             ),
             loader.ConfigValue(
+                "lastfm_api_key",
+                "460cda35be2fbf4f28e8ea7a38580730",
+                "Last.FM API key",
+                validator=validators.String(),
+            ),
+            loader.ConfigValue(
                 "crypto_address",
                 "YOUR_WALLET_ADDRESS",
                 "Крипто-кошелёк",
@@ -128,7 +134,7 @@ class PlaceholdersMod(loader.Module):
         try:
             stars_status = await self._client(GetStarsStatusRequest(entity='me'))
             self.stars_balance = stars_status.balance
-        except:
+        except Exception:
             self.stars_balance = 0
 
         self.tz = timezone(timedelta(hours=self.config["timezone"]))
@@ -236,9 +242,12 @@ class PlaceholdersMod(loader.Module):
         return str(self.me.dc_id if hasattr(self.me, "dc_id") else "Неизвестно")
     
     async def get_stars(self):
-        result = await self.client(GetStarsStatusRequest("me"))
-        stars = result.balance.amount if result and result.balance else 0
-        return f"{stars:,}".replace(",", " ") if stars else "0"
+        try:
+            result = await self._client(GetStarsStatusRequest("me"))
+            stars = result.balance.amount if result and result.balance else 0
+            return f"{stars:,}".replace(",", " ") if stars else "0"
+        except Exception:
+            return "0"
 
     async def get_usd_to_rub(self):
         cache_key = "usd_rub"
@@ -253,7 +262,7 @@ class PlaceholdersMod(loader.Module):
                 result = f"1 USD ≈ {rate:.2f} RUB"
                 self.cache.set(cache_key, result)
                 return result
-        except:
+        except Exception:
             try:
                 async with self.session.get("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json") as resp:
                     data = await resp.json()
@@ -261,7 +270,7 @@ class PlaceholdersMod(loader.Module):
                     result = f"1 USD ≈ {rate:.2f} RUB"
                     self.cache.set(cache_key, result)
                     return result
-            except:
+            except Exception:
                 return "Курс USD недоступен"
     
     async def get_rub_to_usd(self):
@@ -270,7 +279,7 @@ class PlaceholdersMod(loader.Module):
             try:
                 rate = float(usd_rub.split("≈")[1].strip().split()[0])
                 return f"1 RUB ≈ {1/rate:.4f} USD"
-            except:
+            except Exception:
                 pass
         return "Курс RUB недоступен"
     
@@ -293,7 +302,7 @@ class PlaceholdersMod(loader.Module):
                 result = f"1 TON ≈ {rate:.2f} RUB"
                 self.cache.set(cache_key, result)
                 return result
-        except:
+        except Exception:
             return "Курс TON недоступен"
     
     async def get_rub_to_ton(self):
@@ -302,7 +311,7 @@ class PlaceholdersMod(loader.Module):
             try:
                 rate = float(ton_rub.split("≈")[1].strip().split()[0])
                 return f"1 RUB ≈ {1/rate:.6f} TON"
-            except:
+            except Exception:
                 pass
         return "Курс недоступен"
     
@@ -319,7 +328,7 @@ class PlaceholdersMod(loader.Module):
                 result = f"1 BTC ≈ {rate:,.0f} RUB"
                 self.cache.set(cache_key, result)
                 return result
-        except:
+        except Exception:
             return "Курс BTC недоступен"
     
     async def get_eth_to_rub(self):
@@ -335,7 +344,7 @@ class PlaceholdersMod(loader.Module):
                 result = f"1 ETH ≈ {rate:,.0f} RUB"
                 self.cache.set(cache_key, result)
                 return result
-        except:
+        except Exception:
             return "Курс ETH недоступен"
     
     async def get_stars_to_rub(self): 
@@ -365,7 +374,7 @@ class PlaceholdersMod(loader.Module):
             sent_gb = net.bytes_sent // (1024**3)
             recv_gb = net.bytes_recv // (1024**3)
             return f"↑ {sent_gb} GB │ ↓ {recv_gb} GB"
-        except:
+        except Exception:
             return "↑ 0 GB │ ↓ 0 GB"
     
     async def get_speedtest(self):
@@ -397,7 +406,7 @@ class PlaceholdersMod(loader.Module):
                     result = f"≈ {speed_mbps:.1f} Mbps"
                     self.cache.set(cache_key, result)
                     return result
-            except:
+            except Exception:
                 continue
         
         return "Тест скорости недоступен"
@@ -418,7 +427,7 @@ class PlaceholdersMod(loader.Module):
             used_gb = usage.used // (1024**3)
             total_gb = usage.total // (1024**3)
             return f"{used_gb} GB / {total_gb} GB ({percent:.1f}%)"
-        except:
+        except Exception:
             return "Диск недоступен"
     
     async def get_local_ip(self):
@@ -428,7 +437,7 @@ class PlaceholdersMod(loader.Module):
             ip = s.getsockname()[0]
             s.close()
             return ip
-        except:
+        except Exception:
             return "Неизвестно"
     
     async def get_user_hostname(self): 
@@ -597,7 +606,7 @@ class PlaceholdersMod(loader.Module):
         if cached:
             return cached
         
-        api_key = "460cda35be2fbf4f28e8ea7a38580730"
+        api_key = self.config["lastfm_api_key"]
         
         try:
             async with self.session.get(
@@ -615,8 +624,8 @@ class PlaceholdersMod(loader.Module):
                     result = f"🎵 {stats['playcount']} скробблов"
                     self.cache.set(cache_key, result)
                     return result
-        except:
-            pass
+        except Exception as e:
+            logger.exception(f"Last.FM stats error: {e}")
         
         return "Статистика недоступна"
     
@@ -630,7 +639,7 @@ class PlaceholdersMod(loader.Module):
         if cached:
             return cached
         
-        api_key = "460cda35be2fbf4f28e8ea7a38580730"
+        api_key = self.config["lastfm_api_key"]
         
         try:
             async with self.session.get(
@@ -657,8 +666,8 @@ class PlaceholdersMod(loader.Module):
                     }
                     self.cache.set(cache_key, result)
                     return result
-        except:
-            pass
+        except Exception as e:
+            logger.exception(f"Last.FM track error: {e}")
         
         return None
 

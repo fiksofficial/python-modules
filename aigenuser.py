@@ -22,6 +22,8 @@ import re
 from telethon import functions
 from .. import loader, utils
 
+logger = logging.getLogger(__name__)
+
 
 @loader.tds
 class AiUsernameGen(loader.Module):
@@ -104,7 +106,6 @@ class AiUsernameGen(loader.Module):
     async def client_ready(self, client, db):
         self.client = client
         self.db = db
-        self.logger = logging.getLogger(__name__)
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
 
     async def _query_ai(self, prompt: str) -> str | None:
@@ -121,26 +122,26 @@ class AiUsernameGen(loader.Module):
                         {"role": "user", "content": prompt}
                     ],
                     "temperature": 0.7,
-                    "max_tokens": 150
+                    "max_tokens": 300
                 }
                 async with session.post(self.api_url, json=payload, headers=headers) as resp:
                     if resp.status != 200:
-                        self.logger.error(f"AI response status: {resp.status} - {await resp.text()}")
+                        logger.error(f"AI response status: {resp.status} - {await resp.text()}")
                         return None
                     res = await resp.json()
                     if "choices" not in res or not res["choices"]:
-                        self.logger.error("Invalid AI response structure")
+                        logger.error("Invalid AI response structure")
                         return None
                     return res["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            self.logger.error(f"AI request error: {e}")
+            logger.error(f"AI request error: {e}")
             return None
 
     async def _is_username_available(self, username: str) -> bool:
         try:
             return await self.client(functions.account.CheckUsernameRequest(username=username))
         except Exception as e:
-            self.logger.error(f"Error checking username '{username}': {e}")
+            logger.error(f"Error checking username '{username}': {e}")
             return False
 
     async def get_available(self, usernames: list[str]) -> list[str]:
@@ -183,11 +184,11 @@ class AiUsernameGen(loader.Module):
                 username=username
             ))
 
-            self.logger.info(f"Successfully created channel with username: {username}")
+            logger.info(f"Successfully created channel with username: {username}")
             return username
 
         except Exception as e:
-            self.logger.error(f"Error creating channel for '{username}': {e}")
+            logger.error(f"Error creating channel for '{username}': {e}")
             try:
                 if 'channel' in locals():
                     await self.client(functions.channels.DeleteChannelRequest(channel=channel))
@@ -214,7 +215,7 @@ class AiUsernameGen(loader.Module):
 
         ai_text = await self._query_ai(user_query)
         if not ai_text:
-            return await msg.edit(self.strings["error_ai"])
+            return await utils.answer(msg, self.strings["error_ai"])
 
         usernames = self._filter_and_validate_usernames(ai_text)
         available = await self.get_available(usernames)
@@ -240,12 +241,12 @@ class AiUsernameGen(loader.Module):
         if autocreate:
             if created:
                 channels_list = "\n".join(f"• <code>t.me/{u}</code>" for u in created)
-                await msg.edit(self.strings["created_many"].format(channels_list))
+                await utils.answer(msg, self.strings["created_many"].format(channels_list))
             else:
-                await msg.edit(self.strings["no_free"])
+                await utils.answer(msg, self.strings["no_free"])
         else:
             if available:
                 avail_list = "\n".join(f"• <code>t.me/{u}</code>" for u in available)
-                await msg.edit(self.strings["available_many"].format(avail_list))
+                await utils.answer(msg, self.strings["available_many"].format(avail_list))
             else:
-                await msg.edit(self.strings["no_free"])
+                await utils.answer(msg, self.strings["no_free"])

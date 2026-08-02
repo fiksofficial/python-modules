@@ -29,6 +29,42 @@ logger = logging.getLogger(__name__)
 class DeviceInfo(loader.Module):
     """A module for obtaining information about smartphones"""
 
+    strings = {
+        "name": "DeviceInfo",
+        "searching": "🔍 Searching devices for: <b>{}</b>...",
+        "no_query": "❌ Specify a device name! Example: <code>.di iPhone 15</code>",
+        "no_results": "📭 No devices found for query: <b>{}</b>",
+        "device_list": "📱 Found {} devices for query <b>{}</b>:",
+        "device_info": "📱 <b>{}</b>\n\n{}",
+        "error": "❌ Error: {}. Try again later or check the API.",
+        "network": "📡 <b>Network</b>: {}\n",
+        "launched": "📅 <b>Launch</b>:\n  Announced: {}\n  Status: {}\n",
+        "body": "📏 <b>Body</b>:\n  Dimensions: {}\n  Weight: {}\n  SIM: {}\n  Other: {}\n",
+        "display": "🖥️ <b>Display</b>:\n  Type: {}\n  Size: {}\n  Resolution: {}\n  Protection: {}\n",
+        "platform": "⚙️ <b>Platform</b>:\n  OS: {}\n  Chipset: {}\n  CPU: {}\n  GPU: {}\n",
+        "memory": "💾 <b>Memory</b>:\n  Card slot: {}\n  Internal: {}\n  Other: {}\n",
+        "main_camera": "📷 <b>Main Camera</b>:\n  Modules: {}\n  Features: {}\n  Video: {}\n",
+        "selfie_camera": "🤳 <b>Selfie Camera</b>:\n  Modules: {}\n  Features: {}\n  Video: {}\n",
+        "sound": "🔊 <b>Sound</b>:\n  Loudspeaker: {}\n  Audio Jack: {}\n  Other: {}\n",
+        "comms": "🌐 <b>Comms</b>:\n  Wi-Fi: {}\n  Bluetooth: {}\n  GPS: {}\n  NFC: {}\n  Infrared: {}\n  Radio: {}\n  USB: {}\n",
+        "sensors": "🛠️ <b>Sensors</b>: {}\n",
+        "battery": "🔋 <b>Battery</b>:\n  Type: {}\n  Charging: {}\n",
+        "misc": "🎨 <b>Misc</b>:\n  Colors: {}\n  Models: {}\n",
+        "show_body": "📏 Body",
+        "show_memory": "💾 Memory",
+        "show_cameras": "📷 Cameras",
+        "show_sound": "🔊 Sound",
+        "show_comms": "🌐 Comms",
+        "show_sensors": "🛠️ Sensors",
+        "show_misc": "🎨 Misc",
+        "next_photo": "▶️ Next Photo",
+        "prev_photo": "◀️ Prev Photo",
+        "back": "🔙 Back",
+        "back_to_device": "🔙 To Device",
+        "config_saved": "✅ Configuration saved!",
+        "retrying": "🔄 Retrying request... (attempt {}/{})"
+    }
+
     strings_ru = {
         "name": "DeviceInfo",
         "_cls_doc": "Модуль для получения информации о смартфонах",
@@ -64,42 +100,6 @@ class DeviceInfo(loader.Module):
         "back_to_device": "🔙 К устройству",
         "config_saved": "✅ Конфигурация сохранена!",
         "retrying": "🔄 Повторяю запрос... (попытка {}/{} )"
-    }
-
-    strings = {
-        "name": "DeviceInfo",
-        "searching": "🔍 Searching devices for: <b>{}</b>...",
-        "no_query": "❌ Specify a device name! Example: <code>.di iPhone 15</code>",
-        "no_results": "📭 No devices found for query: <b>{}</b>",
-        "device_list": "📱 Found {} devices for query <b>{}</b>:",
-        "device_info": "📱 <b>{}</b>\n\n{}",
-        "error": "❌ Error: {}. Try again later or check the API.",
-        "network": "📡 <b>Network</b>: {}\n",
-        "launched": "📅 <b>Launch</b>:\n  Announced: {}\n  Status: {}\n",
-        "body": "📏 <b>Body</b>:\n  Dimensions: {}\n  Weight: {}\n  SIM: {}\n  Other: {}\n",
-        "display": "🖥️ <b>Display</b>:\n  Type: {}\n  Size: {}\n  Resolution: {}\n  Protection: {}\n",
-        "platform": "⚙️ <b>Platform</b>:\n  OS: {}\n  Chipset: {}\n  CPU: {}\n  GPU: {}\n",
-        "memory": "💾 <b>Memory</b>:\n  Card slot: {}\n  Internal: {}\n  Other: {}\n",
-        "main_camera": "📷 <b>Main Camera</b>:\n  Modules: {}\n  Features: {}\n  Video: {}\n",
-        "selfie_camera": "🤳 <b>Selfie Camera</b>:\n  Modules: {}\n  Features: {}\n  Video: {}\n",
-        "sound": "🔊 <b>Sound</b>:\n  Loudspeaker: {}\n  Audio Jack: {}\n  Other: {}\n",
-        "comms": "🌐 <b>Comms</b>:\n  Wi-Fi: {}\n  Bluetooth: {}\n  GPS: {}\n  NFC: {}\n  Infrared: {}\n  Radio: {}\n  USB: {}\n",
-        "sensors": "🛠️ <b>Sensors</b>: {}\n",
-        "battery": "🔋 <b>Battery</b>:\n  Type: {}\n  Charging: {}\n",
-        "misc": "🎨 <b>Misc</b>:\n  Colors: {}\n  Models: {}\n",
-        "show_body": "📏 Body",
-        "show_memory": "💾 Memory",
-        "show_cameras": "📷 Cameras",
-        "show_sound": "🔊 Sound",
-        "show_comms": "🌐 Comms",
-        "show_sensors": "🛠️ Sensors",
-        "show_misc": "🎨 Misc",
-        "next_photo": "▶️ Next Photo",
-        "prev_photo": "◀️ Prev Photo",
-        "back": "🔙 Back",
-        "back_to_device": "🔙 To Device",
-        "config_saved": "✅ Configuration saved!",
-        "retrying": "🔄 Retrying request... (attempt {}/{})"
     }
 
     def __init__(self):
@@ -146,16 +146,19 @@ class DeviceInfo(loader.Module):
             await self.session.close()
             logger.info("DeviceInfo: aiohttp session closed")
 
+    @staticmethod
+    def _safe_get(device: Dict[str, Any], key: str, default: str = "N/A") -> str:
+        """Safely get a value from a nested dict or return a default"""
+        if not isinstance(device, dict):
+            return default
+        value = device.get(key)
+        return value if value is not None and value != "" else default
+
     async def _resolve_entity(self, call: InlineMessage, message_id: int, chat_id: int = None):
         """Resolve Telegram entity to Message or int"""
-        if hasattr(call, "message") and call.message:
-            logger.debug("DeviceInfo: Using call.message")
+        if call and getattr(call, "message", None):
             return call.message
-        if chat_id:
-            logger.warning(f"DeviceInfo: call.message is None, falling back to chat_id {chat_id}")
-            return chat_id  
-        logger.warning(f"DeviceInfo: call.message and chat_id are None, falling back to message_id {message_id}")
-        return message_id  
+        return chat_id or message_id
 
     async def _fetch_json(self, endpoint: str, params: Dict[str, Any] = None) -> Any:
         """Fetch JSON from API with retry and caching"""
@@ -208,86 +211,96 @@ class DeviceInfo(loader.Module):
         """Format essential device info (name, network, launch, display, platform, battery)"""
         info_text = ""
         if "network" in device:
-            info_text += self.strings["network"].format(device.get("network", "N/A"))
-        if "launced" in device:  
+            info_text += self.strings["network"].format(self._safe_get(device, "network"))
+        launched = device.get("launched", device.get("launced"))
+        if launched:  
             info_text += self.strings["launched"].format(
-                device["launced"].get("announced", "N/A"),
-                device["launced"].get("status", "N/A")
+                self._safe_get(launched, "announced"),
+                self._safe_get(launched, "status")
             )
         if "display" in device:
+            display = device.get("display", {})
             info_text += self.strings["display"].format(
-                device["display"].get("type", "N/A"),
-                device["display"].get("size", "N/A"),
-                device["display"].get("resolution", "N/A"),
-                device["display"].get("protection", "N/A")
+                self._safe_get(display, "type"),
+                self._safe_get(display, "size"),
+                self._safe_get(display, "resolution"),
+                self._safe_get(display, "protection")
             )
         if "platform" in device:
+            platform = device.get("platform", {})
             info_text += self.strings["platform"].format(
-                device["platform"].get("os", "N/A"),
-                device["platform"].get("chipset", "N/A"),
-                device["platform"].get("cpu", "N/A"),
-                device["platform"].get("gpu", "N/A")
+                self._safe_get(platform, "os"),
+                self._safe_get(platform, "chipset"),
+                self._safe_get(platform, "cpu"),
+                self._safe_get(platform, "gpu")
             )
         if "battery" in device:
+            battery = device.get("battery", {})
             info_text += self.strings["battery"].format(
-                device["battery"].get("battType", "N/A"),
-                device["battery"].get("charging", "N/A")
+                self._safe_get(battery, "battType"),
+                self._safe_get(battery, "charging")
             )
         return info_text
 
     def _format_section(self, section: str, device: Dict[str, Any]) -> str:
         """Format a specific section of device info"""
         if section == "body" and "body" in device:
+            body = device.get("body", {})
             return self.strings["body"].format(
-                device["body"].get("dimension", "N/A"),
-                device["body"].get("weight", "N/A"),
-                device["body"].get("sim", "N/A"),
-                device["body"].get("other", "N/A")
+                self._safe_get(body, "dimension"),
+                self._safe_get(body, "weight"),
+                self._safe_get(body, "sim"),
+                self._safe_get(body, "other")
             )
         if section == "memory" and "memory" in device:
             memory = {item.get("label", ""): item.get("value", "N/A") for item in device.get("memory", [])}
             return self.strings["memory"].format(
-                memory.get("card", "N/A"),
-                memory.get("internal", "N/A"),
-                memory.get("otherMemory", "N/A")
+                self._safe_get(memory, "card"),
+                self._safe_get(memory, "internal"),
+                self._safe_get(memory, "otherMemory")
             )
         if section == "cameras":
             cam_text = ""
             if "mainCamera" in device:
+                main = device.get("mainCamera", {})
                 cam_text += self.strings["main_camera"].format(
-                    device["mainCamera"].get("mainModules", "N/A"),
-                    device["mainCamera"].get("mainFeatures", "N/A"),
-                    device["mainCamera"].get("mainVideo", "N/A")
+                    self._safe_get(main, "mainModules"),
+                    self._safe_get(main, "mainFeatures"),
+                    self._safe_get(main, "mainVideo")
                 )
             if "selfieCamera" in device:
+                selfie = device.get("selfieCamera", {})
                 cam_text += self.strings["selfie_camera"].format(
-                    device["selfieCamera"].get("selfieModules", "N/A"),
-                    device["selfieCamera"].get("selfieFeatures", "N/A"),
-                    device["selfieCamera"].get("selfieVideo", "N/A")
+                    self._safe_get(selfie, "selfieModules"),
+                    self._safe_get(selfie, "selfieFeatures"),
+                    self._safe_get(selfie, "selfieVideo")
                 )
             return cam_text
         if section == "sound" and "sound" in device:
+            sound = device.get("sound", {})
             return self.strings["sound"].format(
-                device["sound"].get("loudSpeaker", "N/A"),
-                device["sound"].get("audioJack", "N/A"),
-                device["sound"].get("otherSound", "N/A")
+                self._safe_get(sound, "loudSpeaker"),
+                self._safe_get(sound, "audioJack"),
+                self._safe_get(sound, "otherSound")
             )
         if section == "comms" and "comms" in device:
+            comms = device.get("comms", {})
             return self.strings["comms"].format(
-                device["comms"].get("wlan", "N/A"),
-                device["comms"].get("bluetooth", "N/A"),
-                device["comms"].get("gps", "N/A"),
-                device["comms"].get("nfc", "N/A"),
-                device["comms"].get("infrared", "N/A"),
-                device["comms"].get("radio", "N/A"),
-                device["comms"].get("usb", "N/A")
+                self._safe_get(comms, "wlan"),
+                self._safe_get(comms, "bluetooth"),
+                self._safe_get(comms, "gps"),
+                self._safe_get(comms, "nfc"),
+                self._safe_get(comms, "infrared"),
+                self._safe_get(comms, "radio"),
+                self._safe_get(comms, "usb")
             )
         if section == "sensors" and "sensors" in device:
-            return self.strings["sensors"].format(device.get("sensors", "N/A"))
+            return self.strings["sensors"].format(self._safe_get(device, "sensors"))
         if section == "misc" and "misc" in device:
+            misc = device.get("misc", {})
             return self.strings["misc"].format(
-                device["misc"].get("colors", "N/A"),
-                device["misc"].get("models", "N/A")
+                self._safe_get(misc, "colors"),
+                self._safe_get(misc, "models")
             )
         return "N/A"
 

@@ -480,15 +480,14 @@ class CuteMessages(loader.Module):
         doc="Toggle CuteMessages on or off.",
         ru_doc="Включение или выключение CuteMessages.",
     )
-    @loader.command()
     async def cutemessages(self, message: Message):
         """Toggle CuteMessages on or off."""
         self.config["enabled"] = not self.config["enabled"]
-        await message.edit(self.strings["ENABLED" if self.config["enabled"] else "DISABLED"])
+        await utils.answer(message, self.strings["ENABLED" if self.config["enabled"] else "DISABLED"])
 
     @loader.command(
         doc="View and modify settings for CuteMessages.",
         ru_doc="Просмотр и изменение настроек CuteMessages.",
     )
     async def cutemessages_settings(self, message: Message):
-        await self.invoke("config", "CuteMessages", peer=message.peer_id)
+        await self.allmodules.commands["config"]("CuteMessages", peer=message.peer_id)

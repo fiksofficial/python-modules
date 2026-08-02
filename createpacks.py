@@ -22,6 +22,7 @@ import string
 import asyncio
 import logging
 import re
+import tempfile
 from PIL import Image, UnidentifiedImageError
 
 from telethon.tl.functions.stickers import CreateStickerSetRequest
@@ -44,7 +45,9 @@ EMOJI_LIMIT = 200
 
 async def process_to_webp(input_path: str, output_path: str, size: int = 512) -> bool:
     try:
-        is_video = input_path.lower().endswith((".mp4", ".webm", ".mov")) or b"ftyp" in open(input_path, "rb").read(32)
+        with open(input_path, "rb") as f:
+            header = f.read(32)
+        is_video = input_path.lower().endswith((".mp4", ".webm", ".mov")) or b"ftyp" in header
         if is_video:
             cap = cv2.VideoCapture(input_path)
             success, frame = cap.read()
@@ -89,7 +92,9 @@ async def process_to_webp(input_path: str, output_path: str, size: int = 512) ->
 
 async def process_to_png(input_path: str, output_path: str, size: int = 100) -> bool:
     try:
-        is_video = input_path.lower().endswith((".mp4", ".webm", ".mov")) or b"ftyp" in open(input_path, "rb").read(32)
+        with open(input_path, "rb") as f:
+            header = f.read(32)
+        is_video = input_path.lower().endswith((".mp4", ".webm", ".mov")) or b"ftyp" in header
         if is_video:
             cap = cv2.VideoCapture(input_path)
             success, frame = cap.read()
@@ -139,9 +144,9 @@ class CreatePacks(loader.Module):
         "processing": "<b>[CreatePacks]</b> Collecting avatars of participants...",
         "no_avatars": "<b>[CreatePacks]</b> No members with avatars",
         "no_valid": "<b>[CreatePacks]</b> Could not process any avatars",
-        "done_pack": "<b>[CreatePacks]</b> Sticker pack is ready:\n<b>[CreatePacks]</b> Open: <a href=\'https://t.me/addstickers/{}\\'>here</a>",
+        "done_pack": "<b>[CreatePacks]</b> Sticker pack is ready:\n<b>[CreatePacks]</b> Open: <a href='https://t.me/addstickers/{}'>here</a>",
         "done_packs": "<b>[CreatePacks]</b> Sticker packs are ready:\n{}",
-        "done_emoji_pack": "<b>[CreatePacks]</b> Emoji pack is ready:\n<b>[CreatePacks]</b> Open: <a href=\'https://t.me/addstickers/{}\\''>here</a>",
+        "done_emoji_pack": "<b>[CreatePacks]</b> Emoji pack is ready:\n<b>[CreatePacks]</b> Open: <a href='https://t.me/addstickers/{}'>here</a>",
         "done_emoji_packs": "<b>[CreatePacks]</b> Emoji packs are ready:\n{}",
         "already": "<b>[CreatePacks]</b> A sticker pack with this name already exists.",
         "emoji_processing": "<b>[CreatePacks]</b> Creating emoji pack from avatars...",
@@ -153,19 +158,23 @@ class CreatePacks(loader.Module):
         "processing": "<b>[CreatePacks]</b> Собираю аватарки участников...",
         "no_avatars": "<b>[CreatePacks]</b> Нет участников с аватарками",
         "no_valid": "<b>[CreatePacks]</b> Не удалось обработать ни одну аватарку",
-        "done_pack": "<b>[CreatePacks]</b> Стикерпак готов:\n<b>[CreatePacks]</b> Открыть: <a href=\'https://t.me/addstickers/{}\\''>здесь</a>",
+        "done_pack": "<b>[CreatePacks]</b> Стикерпак готов:\n<b>[CreatePacks]</b> Открыть: <a href='https://t.me/addstickers/{}'>здесь</a>",
         "done_packs": "<b>[CreatePacks]</b> Стикерпаки готовы:\n{}",
-        "done_emoji_pack": "<b>[CreatePacks]</b> Эмодзи-пак готов:\n<b>[CreatePacks]</b> Открыть: <a href=\'https://t.me/addstickers/{}\\''>здесь</a>",
+        "done_emoji_pack": "<b>[CreatePacks]</b> Эмодзи-пак готов:\n<b>[CreatePacks]</b> Открыть: <a href='https://t.me/addstickers/{}'>здесь</a>",
         "done_emoji_packs": "<b>[CreatePacks]</b> Эмодзи-паки готовы:\n{}",
         "already": "<b>[CreatePacks]</b> Стикерпак с таким именем уже существует",
         "emoji_processing": "<b>[CreatePacks]</b> Создаю эмодзи-пак из аватаров...",
         "emoji_no_emoji": "<b>[CreatePacks]</b> Эмодзи не указан — используется",
     }
 
+    async def client_ready(self, client, db):
+        self._client = client
+        self.db = db
+
     async def _get_avatar_files(self, message, format: str = "webp", size: int = 512) -> tuple[list[str], str]:
         chat = await message.get_chat()
         cid = abs(message.chat_id)
-        tmp_dir = f"/tmp/avatars_{cid}_{random.randint(1000, 9999)}"
+        tmp_dir = os.path.join(tempfile.gettempdir(), f"avatars_{cid}_{random.randint(1000, 9999)}")
         os.makedirs(tmp_dir, exist_ok=True)
 
         users = []
@@ -269,11 +278,11 @@ class CreatePacks(loader.Module):
     )
     async def createavatars(self, message):
         """- Create a sticker pack from avatars in a group"""
-        await message.edit(self.strings("processing"))
+        status = await utils.answer(message, self.strings("processing"))
 
         files, tmp_dir = await self._get_avatar_files(message, format="webp", size=512)
         if not files:
-            return await message.edit(self.strings("no_avatars"))
+            return await status.edit(self.strings("no_avatars"))
 
         all_stickers = []
         for path in files:
@@ -293,7 +302,7 @@ class CreatePacks(loader.Module):
         
         if not all_stickers:
             shutil.rmtree(tmp_dir, ignore_errors=True)
-            return await message.edit(self.strings("no_valid"))
+            return await status.edit(self.strings("no_valid"))
 
         created_packs_links = []
         pack_number = 1
@@ -301,22 +310,21 @@ class CreatePacks(loader.Module):
             current_pack_stickers = all_stickers[i : i + STATIC_STICKER_LIMIT]
             short_name, full_title = await self._create_sticker_pack(message, current_pack_stickers, False, pack_number)
             if short_name == "already_exists":
-                await message.edit(self.strings("already"))
+                await status.edit(self.strings("already"))
                 shutil.rmtree(tmp_dir, ignore_errors=True)
                 return
             elif short_name:
-                created_packs_links.append(f"<a href=\'https://t.me/addstickers/{short_name}\\''>{full_title}</a>")
+                created_packs_links.append(f"<a href='https://t.me/addstickers/{short_name}'>{utils.escape_html(full_title)}</a>")
             pack_number += 1
 
         if created_packs_links:
             if len(created_packs_links) == 1:
-                # Extract short name for the single link format
                 sn = created_packs_links[0].split('/')[-1].split("'")[0]
-                await message.edit(self.strings("done_pack").format(sn))
+                await status.edit(self.strings("done_pack").format(sn))
             else:
-                await message.edit(self.strings("done_packs").format("\n".join(created_packs_links)))
+                await status.edit(self.strings("done_packs").format("\n".join(created_packs_links)))
         else:
-            await message.edit(self.strings("no_valid"))
+            await status.edit(self.strings("no_valid"))
 
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -328,15 +336,14 @@ class CreatePacks(loader.Module):
         """[emoji] - Create an emoji pack from all avatars"""
         args = utils.get_args_raw(message)
         emoji = args.strip() if args else "🖼️"
+        status = await utils.answer(message, self.strings("emoji_processing"))
         if not args:
-            await message.edit(self.strings("emoji_no_emoji") + f" `{emoji}`")
-            await asyncio.sleep(1.5)
-
-        await message.edit(self.strings("emoji_processing"))
+            await asyncio.sleep(0.5)
+            await status.edit(self.strings("emoji_no_emoji") + f" `{emoji}`")
 
         files, tmp_dir = await self._get_avatar_files(message, format="png", size=100)
         if not files:
-            return await message.edit(self.strings("no_avatars"))
+            return await status.edit(self.strings("no_avatars"))
 
         all_emojis = []
         for path in files:
@@ -356,7 +363,7 @@ class CreatePacks(loader.Module):
 
         if not all_emojis:
             shutil.rmtree(tmp_dir, ignore_errors=True)
-            return await message.edit(self.strings("no_valid"))
+            return await status.edit(self.strings("no_valid"))
 
         created_packs_links = []
         pack_number = 1
@@ -364,20 +371,20 @@ class CreatePacks(loader.Module):
             current_pack_emojis = all_emojis[i : i + EMOJI_LIMIT]
             short_name, full_title = await self._create_sticker_pack(message, current_pack_emojis, True, pack_number, emoji)
             if short_name == "already_exists":
-                await message.edit(self.strings("already"))
+                await status.edit(self.strings("already"))
                 shutil.rmtree(tmp_dir, ignore_errors=True)
                 return
             elif short_name:
-                created_packs_links.append(f"<a href=\'https://t.me/addstickers/{short_name}\\''>{full_title}</a>")
+                created_packs_links.append(f"<a href='https://t.me/addstickers/{short_name}'>{utils.escape_html(full_title)}</a>")
             pack_number += 1
 
         if created_packs_links:
             if len(created_packs_links) == 1:
                 sn = created_packs_links[0].split('/')[-1].split("'")[0]
-                await message.edit(self.strings("done_emoji_pack").format(sn))
+                await status.edit(self.strings("done_emoji_pack").format(sn))
             else:
-                await message.edit(self.strings("done_emoji_packs").format("\n".join(created_packs_links)))
+                await status.edit(self.strings("done_emoji_packs").format("\n".join(created_packs_links)))
         else:
-            await message.edit(self.strings("no_valid"))
+            await status.edit(self.strings("no_valid"))
 
         shutil.rmtree(tmp_dir, ignore_errors=True)

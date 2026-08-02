@@ -19,7 +19,7 @@ import json
 import asyncio
 import logging
 import re
-from hikkatl.types import Message
+from telethon.tl.types import Message
 from ..inline.types import BotMessage
 from typing import Union, List, Optional
 
@@ -137,7 +137,14 @@ class AIModule(loader.Module):
     async def client_ready(self, client, db):
         self._client = client
         self._db = db
+        self._session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30)
+        )
         self.history = self._db.get(self.strings["name"], "history", [])
+
+    async def on_unload(self):
+        if self._session:
+            await self._session.close()
 
     def _truncate_history(self):
         if not self.config["SAVE_HISTORY"]:
@@ -153,52 +160,51 @@ class AIModule(loader.Module):
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.post(API_URL, headers=headers, json=payload, timeout=30) as response:
-                    if response.status == 401:
-                        raise aiohttp.ClientResponseError(
-                            response.request_info,
-                            response.history,
-                            status=401,
-                            message="Invalid or expired API key"
-                        )
-                    if response.status == 429:
-                        raise aiohttp.ClientResponseError(
-                            response.request_info,
-                            response.history,
-                            status=429,
-                            message="Rate limit exceeded"
-                        )
-                    if response.status == 400:
-                        raise aiohttp.ClientResponseError(
-                            response.request_info,
-                            response.history,
-                            status=400,
-                            message="Invalid request parameters"
-                        )
-                    response.raise_for_status()
-                    data = await response.json()
-                    if "choices" in data and len(data["choices"]) > 0:
-                        content = data["choices"][0]["message"]["content"]
-                        logging.debug(f"API response content: {content}")
-                        return content
-                    return None
-            except aiohttp.ClientResponseError as e:
-                logging.error(f"API request failed: {str(e)}")
-                if e.status == 401:
-                    raise ValueError(self.strings["invalid_api_key"])
-                if e.status == 429:
-                    raise ValueError(self.strings["rate_limit_exceeded"])
-                if e.status == 400:
-                    raise ValueError("Invalid request parameters")
-                raise ValueError(f"HTTP Error: {e.message}")
-            except aiohttp.ClientTimeout:
-                logging.error("API request timed out")
-                raise ValueError("Request timed out after 30 seconds")
-            except aiohttp.ClientError as e:
-                logging.error(f"API client error: {str(e)}")
-                raise ValueError(f"API request failed: {str(e)}")
+        try:
+            async with self._session.post(API_URL, headers=headers, json=payload) as response:
+                if response.status == 401:
+                    raise aiohttp.ClientResponseError(
+                        response.request_info,
+                        response.history,
+                        status=401,
+                        message="Invalid or expired API key"
+                    )
+                if response.status == 429:
+                    raise aiohttp.ClientResponseError(
+                        response.request_info,
+                        response.history,
+                        status=429,
+                        message="Rate limit exceeded"
+                    )
+                if response.status == 400:
+                    raise aiohttp.ClientResponseError(
+                        response.request_info,
+                        response.history,
+                        status=400,
+                        message="Invalid request parameters"
+                    )
+                response.raise_for_status()
+                data = await response.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    content = data["choices"][0]["message"]["content"]
+                    logging.debug(f"API response content: {content}")
+                    return content
+                return None
+        except aiohttp.ClientResponseError as e:
+            logging.error(f"API request failed: {str(e)}")
+            if e.status == 401:
+                raise ValueError(self.strings["invalid_api_key"])
+            if e.status == 429:
+                raise ValueError(self.strings["rate_limit_exceeded"])
+            if e.status == 400:
+                raise ValueError("Invalid request parameters")
+            raise ValueError(f"HTTP Error: {e.message}")
+        except aiohttp.ClientTimeout:
+            logging.error("API request timed out")
+            raise ValueError("Request timed out after 30 seconds")
+        except aiohttp.ClientError as e:
+            logging.error(f"API client error: {str(e)}")
+            raise ValueError(f"API request failed: {str(e)}")
 
     async def _send_long_message(self, message: Message, text: str, reply_markup=None):
         think_pattern = r"<think>(.*?)</think>"
@@ -235,22 +241,22 @@ class AIModule(loader.Module):
     async def ai(self, message: Message):
         args = utils.get_args_raw(message)
         if not args:
-            await utils.answer(message, self.strings["no_question"], parse_mode="html")
+            await utils.answer(message, self.strings["no_question"])
             return
         api_key = self.config["API_KEY"].strip()
         if not api_key:
-            await utils.answer(message, self.strings["no_api_key"].format(prefix=self.get_prefix()), parse_mode="html")
+            await utils.answer(message, self.strings["no_api_key"].format(prefix=self.get_prefix()))
             return
         if len(args) > MAX_INPUT_LENGTH:
-            await utils.answer(message, self.strings["input_too_long"].format(length=len(args), max_length=MAX_INPUT_LENGTH), parse_mode="html")
+            await utils.answer(message, self.strings["input_too_long"].format(length=len(args), max_length=MAX_INPUT_LENGTH))
             return
         save_to_history = not args.startswith("--no-history") and self.config["SAVE_HISTORY"]
         if not save_to_history:
             args = args.replace("--no-history", "").strip()
         if not args:
-            await utils.answer(message, self.strings["no_question"], parse_mode="html")
+            await utils.answer(message, self.strings["no_question"])
             return
-        await utils.answer(message, self.strings["request_sent"], parse_mode="html")
+        await utils.answer(message, self.strings["request_sent"])
         logging.debug(f"Sending request with model: {self.config['MODEL']}")
         messages = [{"role": "system", "content": self.config["SYSTEM_PROMPT"]}] if self.config["SYSTEM_PROMPT"] else []
         if save_to_history:
@@ -279,9 +285,9 @@ class AIModule(loader.Module):
                 ]
                 await self._send_long_message(message, reply, reply_markup)
             else:
-                await utils.answer(message, self.strings["empty_response"], parse_mode="html")
+                await utils.answer(message, self.strings["empty_response"])
         except ValueError as e:
-            await utils.answer(message, self.strings["request_error"].format(error=str(e)), parse_mode="html")
+            await utils.answer(message, self.strings["request_error"].format(error=str(e)))
 
     @loader.command(
         doc="Send file contents to AI. Usage: .txtai [--no-history] (file reply)",
@@ -290,30 +296,30 @@ class AIModule(loader.Module):
     async def txtai(self, message: Message):
         reply = await message.get_reply_message()
         if not reply or not reply.file or not reply.file.name.lower().endswith((".txt", ".md", ".json")):
-            await utils.answer(message, self.strings["no_txt_file"], parse_mode="html")
+            await utils.answer(message, self.strings["no_txt_file"])
             return
         api_key = self.config["API_KEY"].strip()
         if not api_key:
-            await utils.answer(message, self.strings["no_api_key"].format(prefix=self.get_prefix()), parse_mode="html")
+            await utils.answer(message, self.strings["no_api_key"].format(prefix=self.get_prefix()))
             return
-        await utils.answer(message, self.strings["reading_file"], parse_mode="html")
+        await utils.answer(message, self.strings["reading_file"])
         file_bytes = await reply.download_media(bytes)
         try:
             file_text = file_bytes.decode("utf-8").strip()
         except UnicodeDecodeError:
-            await utils.answer(message, "❌ <b>Error:</b> Unable to decode file as UTF-8.", parse_mode="html")
+            await utils.answer(message, "❌ <b>Error:</b> Unable to decode file as UTF-8.")
             return
         if not file_text:
-            await utils.answer(message, self.strings["empty_file"], parse_mode="html")
+            await utils.answer(message, self.strings["empty_file"])
             return
         if len(file_text) > MAX_INPUT_LENGTH:
-            await utils.answer(message, self.strings["input_too_long"].format(length=len(file_text), max_length=MAX_INPUT_LENGTH), parse_mode="html")
+            await utils.answer(message, self.strings["input_too_long"].format(length=len(file_text), max_length=MAX_INPUT_LENGTH))
             return
         args = utils.get_args_raw(message)
         save_to_history = not args.startswith("--no-history") and self.config["SAVE_HISTORY"]
         if not args.startswith("--no-history"):
             args = args.replace("--no-history", "").strip()
-        await utils.answer(message, self.strings["request_sent"], parse_mode="html")
+        await utils.answer(message, self.strings["request_sent"])
         messages = [{"role": "system", "content": self.config["SYSTEM_PROMPT"]}] if self.config["SYSTEM_PROMPT"] else []
         if save_to_history:
             self.history.append({"role": "user", "content": file_text})
@@ -341,9 +347,9 @@ class AIModule(loader.Module):
                 ]
                 await self._send_long_message(message, reply, reply_markup)
             else:
-                await utils.answer(message, self.strings["empty_response"], parse_mode="html")
+                await utils.answer(message, self.strings["empty_response"])
         except ValueError as e:
-            await utils.answer(message, self.strings["request_error"].format(error=str(e)), parse_mode="html")
+            await utils.answer(message, self.strings["request_error"].format(error=str(e)))
 
     @loader.command(
         doc="Clear query history. Usage: .clearai",
@@ -352,7 +358,7 @@ class AIModule(loader.Module):
     async def clearai(self, message: Message):
         self.history = []
         self._db.set(self.strings["name"], "history", [])
-        await utils.answer(message, self.strings["history_cleared"], parse_mode="html")
+        await utils.answer(message, self.strings["history_cleared"])
 
     @loader.command(
         doc="View or change settings. Usage: .aiconfig [--edit]",
@@ -361,7 +367,7 @@ class AIModule(loader.Module):
     async def aiconfig(self, message: Message):
         args = utils.get_args_raw(message)
         if args == "--edit":
-            await self.invoke("config", "AI", peer=message.peer_id)
+            await self.allmodules.commands["config"]("AI", peer=message.peer_id)
             return
         api_key = self.config["API_KEY"].strip()
         masked_key = "********" if api_key else "<not set>"
@@ -375,8 +381,7 @@ class AIModule(loader.Module):
                 save_history=save_history,
                 history_limit=self.config["HISTORY_LIMIT"],
                 system_prompt=system_prompt or "<not set>"
-            ),
-            parse_mode="html"
+            )
         )
 
     @loader.command(
@@ -386,9 +391,9 @@ class AIModule(loader.Module):
     async def aitest(self, message: Message):
         api_key = self.config["API_KEY"].strip()
         if not api_key:
-            await utils.answer(message, self.strings["no_api_key"].format(prefix=self.get_prefix()), parse_mode="html")
+            await utils.answer(message, self.strings["no_api_key"].format(prefix=self.get_prefix()))
             return
-        await utils.answer(message, self.strings["request_sent"], parse_mode="html")
+        await utils.answer(message, self.strings["request_sent"])
         payload = {
             "model": self.config["MODEL"],
             "messages": [{"role": "user", "content": "Test"}],
@@ -397,6 +402,6 @@ class AIModule(loader.Module):
         }
         try:
             await self._send_request(payload, api_key)
-            await utils.answer(message, self.strings["test_success"], parse_mode="html")
+            await utils.answer(message, self.strings["test_success"])
         except ValueError as e:
-            await utils.answer(message, self.strings["test_failed"].format(error=str(e)), parse_mode="html")
+            await utils.answer(message, self.strings["test_failed"].format(error=str(e)))

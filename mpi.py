@@ -16,8 +16,11 @@
 import aiohttp
 import base64
 import json
-from datetime import datetime
+import logging
+from datetime import datetime, timezone
 from .. import loader, utils
+
+logger = logging.getLogger(__name__)
 
 async def download_image(session: aiohttp.ClientSession, url: str):
     try:
@@ -87,6 +90,10 @@ class MinecraftPlayerInfo(loader.Module):
 
     async def client_ready(self, client, db):
         self.client = client
+        self.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=35))
+
+    async def on_unload(self):
+        await self.session.close()
 
     @loader.command(ru_doc="<никнейм> — отображает информацию об игроке Minecraft (3D-рендеринг, история, плащ)")
     async def mcplayer(self, message):
@@ -99,10 +106,11 @@ class MinecraftPlayerInfo(loader.Module):
 
         nick = args.strip()
 
-        async with aiohttp.ClientSession() as session:
+        session = self.session
+        try:
             async with session.get(f"https://api.mojang.com/users/profiles/minecraft/{nick}") as resp:
                 if resp.status == 204 or resp.status != 200:
-                    await loading_msg.edit(self.strings("not_found"))
+                    await utils.answer(loading_msg, self.strings("not_found"))
                     return
                 data = await resp.json()
 
@@ -119,7 +127,7 @@ class MinecraftPlayerInfo(loader.Module):
                 if i == len(names) - 1:
                     history_lines.append(f"• <b>{uname}</b> {self.strings('history_current')}")
                 elif "changedToAt" in entry:
-                    changed = datetime.utcfromtimestamp(entry["changedToAt"] / 1000).strftime("%d.%m.%Y")
+                    changed = datetime.fromtimestamp(entry["changedToAt"] / 1000, tz=timezone.utc).strftime("%d.%m.%Y")
                     history_lines.append(f"• {uname} {self.strings('history_changed').format(changed)}")
                 else:
                     history_lines.append(f"• {uname} {self.strings('history_original')}")
@@ -202,7 +210,7 @@ class MinecraftPlayerInfo(loader.Module):
                 uploaded_media.append(uploaded)
 
             if not uploaded_media:
-                await loading_msg.edit(self.strings("no_media"))
+                await utils.answer(loading_msg, self.strings("no_media"))
                 return
 
             caption = self.strings("info").format(
@@ -224,7 +232,17 @@ class MinecraftPlayerInfo(loader.Module):
                 parse_mode="html",
                 reply_to=message.reply_to_msg_id or message.id
             )
+        except Exception as e:
+            logger.exception(f"Minecraft info error: {e}")
+            await utils.answer(loading_msg, self.strings("not_found"))
+            return
 
-        await loading_msg.delete()
+        try:
+            await loading_msg.delete()
+        except Exception:
+            pass
         if message.out:
-            await message.delete()
+            try:
+                await message.delete()
+            except Exception:
+                pass

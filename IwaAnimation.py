@@ -14,10 +14,12 @@
 
 import asyncio
 import os
+import tempfile
+import time
 import toml
 
 from .. import loader, utils
-from herokutl.tl.types import Message
+from telethon.tl.types import Message
 
 
 @loader.tds
@@ -61,7 +63,9 @@ class IwaAnimation(loader.Module):
     _E = "<emoji document_id=5774077015388852135>❌</emoji>"
     _S = "<emoji document_id=5774022692642492953>✅</emoji>"
 
-    async def client_ready(self):
+    async def client_ready(self, client, db):
+        self.client = client
+        self.db = db
         if not self.db.get("IwaAnimations", "anims", False):
             self.db.set("IwaAnimations", "anims", {})
 
@@ -80,7 +84,7 @@ class IwaAnimation(loader.Module):
                 message, self.strings["err_not_anim"].format(e=self._E)
             )
 
-        tmp = "anim_load.anim"
+        tmp = os.path.join(tempfile.gettempdir(), f"anim_{int(time.time())}.anim")
         await reply.download_media(tmp)
         try:
             data = toml.load(tmp)
@@ -141,7 +145,10 @@ class IwaAnimation(loader.Module):
         try:
             for frame in anim["frames"][1:]:
                 await asyncio.sleep(anim["delay"])
-                await msg.edit(frame)
+                try:
+                    await msg.edit(frame)
+                except Exception:
+                    return
         except Exception:
             pass
 
@@ -193,12 +200,12 @@ class IwaAnimation(loader.Module):
         for i, frame in enumerate(anim["frames"], start=1):
             data[str(i)] = frame.split("\n")
 
-        file = f"{cmd}.anim"
+        file = os.path.join(tempfile.gettempdir(), f"{cmd}_{int(time.time())}.anim")
         try:
             with open(file, "w", encoding="utf-8") as f:
                 toml.dump(data, f)
             await message.delete()
-            await self._client.send_file(message.to_id, file)
+            await self.client.send_file(message.to_id, file)
         finally:
             if os.path.exists(file):
                 os.remove(file)

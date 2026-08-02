@@ -42,13 +42,21 @@ class PointSentenceCaseMod(loader.Module):
         "ignore_off": "❌ Каналы не игнорируются",
     }
 
-    async def client_ready(self, client, db):
-        self.client = client
-        self.db = db
-        if self.db.get("PointSentenceCase", "enabled") is None:
-            self.db.set("PointSentenceCase", "enabled", True)
-        if self.db.get("PointSentenceCase", "ignore_channels") is None:
-            self.db.set("PointSentenceCase", "ignore_channels", True)
+    def __init__(self):
+        self.config = loader.ModuleConfig(
+            loader.ConfigValue(
+                "enabled",
+                True,
+                lambda: "Whether the module is enabled",
+                validator=loader.validators.Boolean(),
+            ),
+            loader.ConfigValue(
+                "ignore_channels",
+                True,
+                lambda: "Whether to ignore messages in channels",
+                validator=loader.validators.Boolean(),
+            ),
+        )
 
     @loader.command(ru_doc="{on/off} — включает/выключает модуль")
     async def pointcase(self, message):
@@ -56,14 +64,14 @@ class PointSentenceCaseMod(loader.Module):
         args = utils.get_args_raw(message).lower()
 
         if args == "on":
-            self.db.set("PointSentenceCase", "enabled", True)
+            self.config["enabled"] = True
             await utils.answer(message, self.strings("enabled"))
         elif args == "off":
-            self.db.set("PointSentenceCase", "enabled", False)
+            self.config["enabled"] = False
             await utils.answer(message, self.strings("disabled"))
         else:
-            status = self.db.get("PointSentenceCase", "enabled", True)
-            ignore = self.db.get("PointSentenceCase", "ignore_channels", True)
+            status = self.config["enabled"]
+            ignore = self.config["ignore_channels"]
             await utils.answer(
                 message,
                 self.strings("status").format(
@@ -78,32 +86,32 @@ class PointSentenceCaseMod(loader.Module):
         args = utils.get_args_raw(message).lower()
 
         if args == "on":
-            self.db.set("PointSentenceCase", "ignore_channels", True)
+            self.config["ignore_channels"] = True
             await utils.answer(message, self.strings("ignore_on"))
         elif args == "off":
-            self.db.set("PointSentenceCase", "ignore_channels", False)
+            self.config["ignore_channels"] = False
             await utils.answer(message, self.strings("ignore_off"))
         else:
-            ignore = self.db.get("PointSentenceCase", "ignore_channels", True)
+            ignore = self.config["ignore_channels"]
             await utils.answer(
                 message,
                 self.strings("ignore_on") if ignore else self.strings("ignore_off"),
             )
 
     async def watcher(self, message):
-        if not self.db.get("PointSentenceCase", "enabled", True):
+        if not self.config["enabled"]:
             return
 
         if not message.out or not message.text:
             return
 
-        if self.db.get("PointSentenceCase", "ignore_channels", True):
+        if self.config["ignore_channels"]:
             try:
                 peer = await message.get_chat()
                 if getattr(peer, "is_channel", False) and not getattr(peer, "is_group", False):
                     return
             except Exception:
-                pass
+                return
 
         text = message.text.strip()
         if not text:
@@ -143,7 +151,10 @@ class PointSentenceCaseMod(loader.Module):
             result += "."
 
         if result != text:
-            await message.edit(result)
+            try:
+                await message.edit(result)
+            except Exception:
+                pass
 
     def is_emoji(self, char: str) -> bool:
         return any([

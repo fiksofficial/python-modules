@@ -14,6 +14,7 @@
 # meta fhsdesc: tool, tools, test, speedtest
 # requires: speedtest-cli
 
+import asyncio
 import speedtest
 from .. import loader, utils
 
@@ -130,17 +131,17 @@ class SpeedTestMod(loader.Module):
         msg = await utils.answer(message, self.strings("starting"))
 
         try:
-            s = speedtest.Speedtest()
-            s.get_best_server()
+            s = await asyncio.to_thread(speedtest.Speedtest)
+            await asyncio.to_thread(s.get_best_server)
             await utils.answer(msg, self.strings("progress_ping"))
 
             ping = s.results.ping
 
             await utils.answer(msg, self.strings("progress_download"))
-            download = s.download() / 1_000_000
+            download = (await asyncio.to_thread(s.download)) / 1_000_000
 
             await utils.answer(msg, self.strings("progress_upload"))
-            upload = s.upload() / 1_000_000
+            upload = (await asyncio.to_thread(s.upload)) / 1_000_000
 
             text = (
                 f"{self.strings('finished')}\n\n"

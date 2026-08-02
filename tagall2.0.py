@@ -17,6 +17,9 @@ from .. import loader, utils
 from telethon.tl.types import ChannelParticipantsAdmins, UserStatusRecently, UserStatusOnline, Message
 import typing
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 @loader.tds
 class TagAllMod(loader.Module):
@@ -27,6 +30,9 @@ class TagAllMod(loader.Module):
         "done": "✅ <b>{}</b> users mentioned",
         "no_users": "⚠️ No users found matching this filter",
         "invalid_args": "❌ Invalid command format. Use: .tagall {all/admins/online/active} {text}",
+        "confirm": "⚠️ This will send <b>{}</b> messages to <b>{}</b>. Continue? (yes/no)",
+        "cancelled": "❌ Canceled.",
+        "invalid_confirm": "❌ Please reply with <b>yes</b> or <b>no</b>.",
     }
 
     strings_ru = {
@@ -34,7 +40,32 @@ class TagAllMod(loader.Module):
         "done": "✅ Упомянуто <b>{}</b> пользователей",
         "no_users": "⚠️ Не найдено пользователей по данному фильтру",
         "invalid_args": "❌ Неверный формат команды. Используйте: .tagall {all/admins/online/active} {текст}",
+        "confirm": "⚠️ Будет отправлено <b>{}</b> сообщений в <b>{}</b>. Продолжить? (да/нет)",
+        "cancelled": "❌ Отменено.",
+        "invalid_confirm": "❌ Ответьте <b>да</b> или <b>нет</b>.",
     }
+
+    def __init__(self):
+        self.config = loader.ModuleConfig(
+            loader.ConfigValue(
+                "batch_size",
+                5,
+                lambda: "How many users to mention per message",
+                validator=loader.validators.Integer(minimum=1, maximum=20),
+            ),
+            loader.ConfigValue(
+                "delay",
+                2,
+                lambda: "Delay between messages (seconds)",
+                validator=loader.validators.Integer(minimum=0, maximum=30),
+            ),
+            loader.ConfigValue(
+                "confirm_threshold",
+                10,
+                lambda: "Messages count at which to ask for confirmation",
+                validator=loader.validators.Integer(minimum=1, maximum=100),
+            ),
+        )
 
     async def client_ready(self, client, db):
         self.client = client
@@ -53,15 +84,43 @@ class TagAllMod(loader.Module):
             return
 
         chat = await self.client.get_entity(message.chat_id)
-        tagged = await self._do_tagall(chat, mode, text)
-        if not tagged:
+        users = await self._collect_users(chat, mode)
+        if not users:
             await utils.answer(message, self.strings["no_users"])
             return
+
+        batch_size = self.config["batch_size"]
+        messages_count = -(-len(users) // batch_size)
+        if messages_count > self.config["confirm_threshold"]:
+            confirm = await self._ask_confirmation(message, messages_count, utils.escape_html(getattr(chat, "title", None) or chat.id))
+            if confirm is None:
+                return
+            if not confirm:
+                await utils.answer(message, self.strings["cancelled"])
+                return
+
+        tagged = await self._send_mentions(chat, text, users, batch_size)
         await utils.answer(message, self.strings["done"].format(tagged))
 
-    async def _do_tagall(self, chat, filter_: str, text: str = "") -> typing.Optional[int]:
-        users = []
+    async def _ask_confirmation(self, message, messages_count: int, chat_name) -> typing.Optional[bool]:
+        status = await utils.answer(message, self.strings["confirm"].format(messages_count, chat_name))
+        try:
+            async with self.client.conversation(message.chat_id, timeout=30) as conv:
+                response = await conv.get_response()
+                answer = utils.get_args_raw(response).lower().strip()
+                if answer in {"yes", "да", "y", "д"}:
+                    return True
+                if answer in {"no", "нет", "n", "н"}:
+                    return False
+                await conv.send_message(self.strings["invalid_confirm"])
+                return None
+        except Exception as e:
+            logger.debug(f"Confirmation timeout or error: {e}")
+            await utils.answer(message, self.strings["cancelled"])
+            return None
 
+    async def _collect_users(self, chat, filter_: str):
+        users = []
         try:
             if filter_ == "all":
                 async for user in self.client.iter_participants(chat):
@@ -87,25 +146,23 @@ class TagAllMod(loader.Module):
                             if not user.bot:
                                 users.append(user)
                                 user_ids.add(msg.sender_id)
-                        except Exception:
+                        except Exception as e:
+                            logger.debug(f"Failed to resolve user {msg.sender_id}: {e}")
                             continue
-
-            if not users:
-                return None
-
-            batch_size = 5
-            tagged = 0
-            for i in range(0, len(users), batch_size):
-                batch = users[i:i + batch_size]
-                mentions = " ".join([f"<span class='tg-spoiler'><a href='tg://user?id={u.id}'>{u.first_name or 'User'}</a></span>" for u in batch])
-                msg_text = f"<b>{text}</b>\n{mentions}" if text else mentions
-                await self.client.send_message(chat, msg_text, link_preview=False, parse_mode="html")
-                tagged += len(batch)
-                if i + batch_size < len(users):
-                    await asyncio.sleep(2)
-
-            return tagged
-
         except Exception as e:
-            self._log.error(f"Error in tagall: {e}")
-            return None
+            logger.error(f"Error collecting users in tagall: {e}")
+            return []
+        return users
+
+    async def _send_mentions(self, chat, text: str, users, batch_size: int) -> int:
+        tagged = 0
+        delay = self.config["delay"]
+        for i in range(0, len(users), batch_size):
+            batch = users[i:i + batch_size]
+            mentions = " ".join([f"<a href='tg://user?id={u.id}'>{utils.escape_html(u.first_name) or 'User'}</a>" for u in batch])
+            msg_text = f"<b>{utils.escape_html(text)}</b>\n{mentions}" if text else mentions
+            await self.client.send_message(chat, msg_text, link_preview=False, parse_mode="html")
+            tagged += len(batch)
+            if i + batch_size < len(users):
+                await asyncio.sleep(delay)
+        return tagged
