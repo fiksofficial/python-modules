@@ -197,17 +197,24 @@ class GitHubInfoMod(loader.Module):
             "Accept": "application/vnd.github+json" if github_api else "application/json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+        self.logger.debug(f"[GitHub] GET {url}")
         try:
             async with self._session.get(url, headers=headers) as resp:
                 raw = await resp.text()
+                self.logger.debug(f"[GitHub] status={resp.status} raw={raw[:500]}")
                 if not raw:
-                    return {}
+                    self.logger.warning(f"[GitHub] empty response from {url}")
+                    return {"message": "empty response"}
                 data = await resp.json(content_type=None)
                 if not resp.ok:
+                    self.logger.warning(f"[GitHub] HTTP {resp.status}: {data}")
                     return {"message": data.get("message", resp.status)}
                 return data
+        except aiohttp.ClientError as e:
+            self.logger.error(f"[GitHub] ClientError {url}: {e}")
+            return {"message": f"network error: {e}"}
         except Exception as e:
-            self.logger.error(f"[GitHub] {e}")
+            self.logger.error(f"[GitHub] {e} on {url}", exc_info=True)
             return {"message": str(e)}
 
     @loader.command(ru_doc="{username без @} — Информация о GitHub пользователе")
@@ -220,7 +227,11 @@ class GitHubInfoMod(loader.Module):
 
         user_data = await self.github_fetch(f"https://api.github.com/users/{username}")
         if "message" in user_data:
-            await utils.answer(message, self.strings("user_not_found").format(username))
+            self.logger.warning(f"[GitHub] user '{username}' lookup failed: {user_data['message']}")
+            if "not found" in str(user_data["message"]).lower():
+                await utils.answer(message, self.strings("user_not_found").format(username))
+            else:
+                await utils.answer(message, self.strings("api_error").format(msg=user_data["message"]))
             return
 
         hireable = self.strings("hireable_yes") if user_data.get("hireable") else self.strings("hireable_no")
