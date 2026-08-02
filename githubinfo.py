@@ -197,11 +197,11 @@ class GitHubInfoMod(loader.Module):
             "Accept": "application/vnd.github+json" if github_api else "application/json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        self.logger.debug(f"[GitHub] GET {url}")
+        self.logger.info(f"[GitHub] GET {url}")
         try:
             async with self._session.get(url, headers=headers) as resp:
                 raw = await resp.text()
-                self.logger.debug(f"[GitHub] status={resp.status} raw={raw[:500]}")
+                self.logger.info(f"[GitHub] status={resp.status} raw={raw[:500]}")
                 if not raw:
                     self.logger.warning(f"[GitHub] empty response from {url}")
                     return {"message": "empty response"}
