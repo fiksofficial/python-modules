@@ -81,12 +81,12 @@ class GitHubInfoMod(loader.Module):
         "create_tag": "✨ Created tag <code>{ref}</code> in <a href=\"https://github.com/{repo}/releases/tag/{ref}\">{repo}</a>\n",
         "create_repo": "✨ Created repository <a href=\"https://github.com/{repo}\">{repo}</a>\n",
 
-        "pr_opened": "🔄 Opened PR <a href=\"{url}\">#{} {title}</a>\n",
-        "pr_closed": "🔄 Closed PR <a href=\"{url}\">#{} {title}</a>\n",
-        "pr_merged": "🔄 Merged PR <a href=\"{url}\">#{} {title}</a>\n",
+        "pr_opened": "🔄 Opened PR <a href=\"{url}\">#{number} {title}</a>\n",
+        "pr_closed": "🔄 Closed PR <a href=\"{url}\">#{number} {title}</a>\n",
+        "pr_merged": "🔄 Merged PR <a href=\"{url}\">#{number} {title}</a>\n",
 
-        "issue_opened": "❗ Opened issue <a href=\"{url}\">#{} {title}</a>\n",
-        "issue_closed": "❗ Closed issue <a href=\"{url}\">#{} {title}</a>\n",
+        "issue_opened": "❗ Opened issue <a href=\"{url}\">#{number} {title}</a>\n",
+        "issue_closed": "❗ Closed issue <a href=\"{url}\">#{number} {title}</a>\n",
 
         "star": "⭐ Starred <a href=\"https://github.com/{repo}\">{repo}</a>\n",
         "fork": "⑂ Forked <a href=\"https://github.com/{fork}\">{fork}</a>\n",
@@ -158,12 +158,12 @@ class GitHubInfoMod(loader.Module):
         "create_tag": "✨ Создал тег <code>{ref}</code> в <a href=\"https://github.com/{repo}/releases/tag/{ref}\">{repo}</a>\n",
         "create_repo": "✨ Создал репозиторий <a href=\"https://github.com/{repo}\">{repo}</a>\n",
 
-        "pr_opened": "🔄 Открыл PR <a href=\"{url}\">#{} {title}</a>\n",
-        "pr_closed": "🔄 Закрыл PR <a href=\"{url}\">#{} {title}</a>\n",
-        "pr_merged": "🔄 Замержил PR <a href=\"{url}\">#{} {title}</a>\n",
+        "pr_opened": "🔄 Открыл PR <a href=\"{url}\">#{number} {title}</a>\n",
+        "pr_closed": "🔄 Закрыл PR <a href=\"{url}\">#{number} {title}</a>\n",
+        "pr_merged": "🔄 Замержил PR <a href=\"{url}\">#{number} {title}</a>\n",
 
-        "issue_opened": "❗ Открыл issue <a href=\"{url}\">#{} {title}</a>\n",
-        "issue_closed": "❗ Закрыл issue <a href=\"{url}\">#{} {title}</a>\n",
+        "issue_opened": "❗ Открыл issue <a href=\"{url}\">#{number} {title}</a>\n",
+        "issue_closed": "❗ Закрыл issue <a href=\"{url}\">#{number} {title}</a>\n",
 
         "star": "⭐ Добавил в избранное <a href=\"https://github.com/{repo}\">{repo}</a>\n",
         "fork": "⑂ Форкнул <a href=\"https://github.com/{fork}\">{fork}</a>\n",
@@ -188,7 +188,7 @@ class GitHubInfoMod(loader.Module):
                 "",
                 "GitHub Personal Access Token (github.com/settings/tokens).\n"
                 "Без токена: 60 запросов/час. С токеном: 5000 запросов/час.",
-                validator=loader.validators.String(),
+                validator=loader.validators.Hidden(),
             ),
         )
 
@@ -210,20 +210,17 @@ class GitHubInfoMod(loader.Module):
         token = self.config["github_token"]
         if token:
             headers["Authorization"] = f"Bearer {token}"
-            logger.info(f"[GitHub] token applied: ...{token[-6:]}")
-        else:
-            logger.info("[GitHub] token NOT configured (60 req/h limit)")
-        logger.info(f"[GitHub] GET {url}")
         try:
             async with self._session.get(url, headers=headers) as resp:
                 raw = await resp.text()
-                logger.info(f"[GitHub] status={resp.status} raw={raw[:500]}")
                 if not raw:
-                    logger.warning(f"[GitHub] empty response from {url}")
                     return {"message": "empty response"}
-                data = await resp.json(content_type=None)
+                try:
+                    data = json.loads(raw)
+                except (json.JSONDecodeError, ValueError):
+                    logger.warning(f"[GitHub] invalid JSON from {url}: {raw[:200]}")
+                    return {"message": f"invalid response: {raw[:100]}"}
                 if not resp.ok:
-                    logger.warning(f"[GitHub] HTTP {resp.status}: {data}")
                     return {"message": data.get("message", resp.status)}
                 return data
         except aiohttp.ClientError as e:
@@ -466,6 +463,9 @@ class GitHubInfoMod(loader.Module):
 
     async def _contrib(self, call, username: str):
         data = await self.github_fetch(f"https://github-contributions-api.deno.dev/{username}.json", github_api=False)
+        if "message" in data:
+            await call.edit(self.strings("api_error").format(msg=data["message"]), reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]])
+            return
         if not data or not data.get("contributions"):
             await call.edit(self.strings("no_contrib"), reply_markup=[[{"text": self.strings("btn_back"), "callback": self._profile, "args": (username,)}]])
             return
