@@ -550,8 +550,9 @@ class PlaceholdersMod(loader.Module):
             await utils.answer(message, self.strings["phtest_usage"])
             return
 
-        data = await utils.get_placeholders({}, args)
+        data = {}
         try:
+            data = await utils.get_placeholders(data, args)
             out = args.format(**data)
         except KeyError as e:
             out = self.strings["phtest_unknown"].format(e)
@@ -764,11 +765,45 @@ class PlaceholdersMod(loader.Module):
             "https://api.coingecko.com/api/v3/simple/price",
             params={"ids": "bitcoin,ethereum,toncoin", "vs_currencies": "rub,usd"},
         )
-        if not data:
-            return None
+        if not data or "toncoin" not in data:
+            data = await self._crypto_fallback()
 
-        self.cache.set(cache_key, data)
+        if data:
+            self.cache.set(cache_key, data)
         return data
+
+    async def _crypto_fallback(self):
+        usd_rub = None
+        rates = await self._get_rates()
+        if rates and "RUB" in rates:
+            usd_rub = rates["RUB"]
+
+        data = {}
+        ton = await self._fetch_json(
+            "https://tonapi.io/v2/rates",
+            params={"tokens": "ton", "currencies": "rub,usd"},
+        )
+        try:
+            prices = ton["rates"]["TON"]["prices"]
+            data["toncoin"] = {"rub": prices["RUB"], "usd": prices["USD"]}
+        except (KeyError, TypeError):
+            pass
+
+        for symbol, key in (("BTCUSDT", "bitcoin"), ("ETHUSDT", "ethereum")):
+            tick = await self._fetch_json(
+                "https://api.binance.com/api/v3/ticker/price",
+                params={"symbol": symbol},
+            )
+            try:
+                usd = float(tick["price"])
+                entry = {"usd": usd}
+                if usd_rub:
+                    entry["rub"] = usd * usd_rub
+                data[key] = entry
+            except (KeyError, TypeError, ValueError):
+                pass
+
+        return data or None
 
     async def _get_github(self):
         user = self.config["github_username"]
@@ -885,10 +920,20 @@ class PlaceholdersMod(loader.Module):
         return str(self.me.id)
 
     async def get_phone(self):
-        return self.me.phone or self.strings["hidden"]
+        phone = getattr(self.me, "phone", None)
+        if not phone:
+            try:
+                full = await self._client(GetFullUserRequest(self.me))
+                phone = full.full_user.phone
+            except Exception:
+                phone = None
+        return phone or self.strings["hidden"]
 
     async def get_dc_id(self):
-        return str(self.me.dc_id if hasattr(self.me, "dc_id") else self.strings["unknown"])
+        try:
+            return str(self._client.session.dc_id)
+        except Exception:
+            return self.strings["unknown"]
 
     async def get_stars(self):
         try:
